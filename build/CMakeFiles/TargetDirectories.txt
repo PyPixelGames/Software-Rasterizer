@@ -1,0 +1,3 @@
+/home/luka/projects/software-rasterizer/build/CMakeFiles/SoRas.dir
+/home/luka/projects/software-rasterizer/build/CMakeFiles/edit_cache.dir
+/home/luka/projects/software-rasterizer/build/CMakeFiles/rebuild_cache.dir
