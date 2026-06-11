@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
         static uint8_t colorOffset = 0;
         colorOffset++;
         for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; ++i) {
-            pixelBuffer[i] = (0xFF << 24) | (225 << 16) | (colorOffset << 8) | colorOffset;
+            pixelBuffer[i] = (0xFF << 24) | (colorOffset << 16) | (225 << 8) | colorOffset;
         }
 
         void* texturePixels = nullptr;
