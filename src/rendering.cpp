@@ -8,28 +8,25 @@ Renderer::Renderer(int width, int height){
 	}
 
 	if (!SDL_CreateWindowAndRenderer("Software Rasterizer", width, height,
-				SDL_WINDOW_FULLSCREEN, &window, &renderer)) {
+				0, &window, &renderer)) {
 		std::cerr << "Window/Renderer Creation Error: " << SDL_GetError() << std::endl;
 		return;
 	}
-	SDL_SetRenderVSync(renderer, 1);
+	SDL_SetRenderVSync(renderer, 0);
 
 	SDL_SetRenderLogicalPresentation(renderer, width, height,
 			SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
-	texture = SDL_CreateTexture(
-			renderer,
-			SDL_PIXELFORMAT_XRGB8888,
-			SDL_TEXTUREACCESS_STREAMING,
-			width,
-			height
-			);
+	texture = SDL_CreateTexture(renderer,SDL_PIXELFORMAT_XRGB8888,
+			SDL_TEXTUREACCESS_STREAMING,width,height);
 	SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 
 	if (!texture) {
 		std::cerr << "Texture Creation Error: " << SDL_GetError() << std::endl;
 		return;
 	}
+
+	lastTicks = SDL_GetTicksNS();
 }
 
 Renderer::~Renderer(){
@@ -40,6 +37,21 @@ Renderer::~Renderer(){
 }
 
 bool Renderer::update(Screen& screen){
+	Uint64 now = SDL_GetTicksNS();
+    Uint64 frameTicks = now - lastTicks;
+    lastTicks = now;
+
+    deltaTime = frameTicks / 1'000'000'000.0f;
+	fps = 1'000'000'000.0f / frameTicks;
+	avgFpsCounter+=fps;
+	counter++;
+
+	if (counter == avgFpsCycles){
+		counter=0;
+		avgFps=avgFpsCounter/avgFpsCycles;
+		avgFpsCounter=0;
+	}
+
 	bool running = true;
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {

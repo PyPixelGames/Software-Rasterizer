@@ -13,6 +13,7 @@ add_executable(${APP_NAME}
     src/main.cpp
     src/types.hpp
     src/rendering.cpp
+	src/helper.cpp
 )
 
 target_link_libraries(${APP_NAME} PRIVATE SDL3::SDL3)

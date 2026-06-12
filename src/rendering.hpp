@@ -8,6 +8,16 @@ class Renderer{
 		SDL_Window* window = nullptr;
 		SDL_Renderer* renderer = nullptr;
 		SDL_Texture* texture = nullptr;
+
+		Uint64 lastTicks;
+
+		float fps;
+		float deltaTime;
+		float avgFps=0;
+		float avgFpsCounter;
+		int avgFpsCycles=50;
+		int counter=0;
+
 		Renderer(int width, int height);
 		~Renderer();
 		bool update(Screen& screen);
