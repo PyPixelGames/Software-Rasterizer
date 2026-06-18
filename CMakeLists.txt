@@ -14,6 +14,11 @@ add_executable(${APP_NAME}
     src/types.hpp
     src/rendering.cpp
 	src/helper.cpp
+	src/loader.cpp
+)
+
+target_include_directories(SoRas PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
 )
 
 target_link_libraries(${APP_NAME} PRIVATE SDL3::SDL3)

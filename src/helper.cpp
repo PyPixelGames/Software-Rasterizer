@@ -2,6 +2,8 @@
 #include <iostream>
 
 void changePixel(Screen& screen, Pos2 pos, uint32_t color){
+	if (pos.x < 0 || pos.x >= screen.width ||
+        pos.y < 0 || pos.y >= screen.height) return;
 	screen.pixelBuffer[pos.y*screen.width+pos.x]=color;
 }
 
@@ -202,4 +204,21 @@ Pos2 viewportToCanvas(Screen& screen, Viewport& port, FPos2 pos){
 
 Pos2 projectVertex(Screen& screen, Viewport& port, FPos3 v){
 	return viewportToCanvas(screen, port, worldToViewport(port, v));
+}
+
+void renderModel(Screen& screen, Viewport& port, Model& model){
+	std::vector<Pos2> screenPoints;
+	for (auto tri : model.model.tris){
+		screenPoints.clear();
+		for (int idx: tri){
+			FPos3 vert = {
+				model.model.vertices[idx-1].x+model.worldPos.x,
+				model.model.vertices[idx-1].y+model.worldPos.y,
+				model.model.vertices[idx-1].z+model.worldPos.z,
+			};
+
+			screenPoints.push_back(projectVertex(screen, port, vert));
+		}
+		drawWireframeTriangle(screen, screenPoints[0], screenPoints[1], screenPoints[2]);
+	}
 }

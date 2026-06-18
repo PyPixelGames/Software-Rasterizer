@@ -20,3 +20,5 @@ FPos2 worldToViewport(Viewport& port, FPos3 pos);
 Pos2 viewportToCanvas(Screen& screen, Viewport& port, FPos2 pos);
 
 Pos2 projectVertex(Screen& screen, Viewport& port, FPos3 v);
+
+void renderModel(Screen& screen, Viewport& port, Model& model);

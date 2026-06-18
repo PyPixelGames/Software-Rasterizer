@@ -3,6 +3,7 @@
 ObjModel parseObjHeader(const std::string& filename) {
     std::ifstream file(filename);
     ObjModel data;
+	std::vector<int> faces;
 
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file " << filename << std::endl;
@@ -28,7 +29,7 @@ ObjModel parseObjHeader(const std::string& filename) {
         }
         // Geometric Vertices
         else if (prefix == "v") {
-            Vertex v;
+            FPos3 v;
             ss >> v.x >> v.y >> v.z;
             data.vertices.push_back(v);
         }
@@ -40,15 +41,34 @@ ObjModel parseObjHeader(const std::string& filename) {
         }
         // Vertex Normals
         else if (prefix == "vn") {
-            Normal vn;
+            FPos3 vn;
             ss >> vn.x >> vn.y >> vn.z;
             data.normals.push_back(vn);
         }
-        // Stop reading once we reach material assignments or face definitions
-        else if (prefix == "usemtl" || prefix == "f") {
-            std::cout << "Reached material/face definitions ('" << prefix << "'). Stopping parser.\n";
-            break;
-        }
+		// Faces
+		else if (prefix == "f"){
+			// get the first nu,bers of a sentance like this:
+			// f 2/1/1 1/2/1 3/3/1 4/4/1
+			// and get all the first numbers as intagers (2, 1, 3, 4)
+
+			std::string vertexStr;
+			faces.clear();
+            while (ss >> vertexStr) {
+                std::stringstream vertexSS(vertexStr);
+                int vertexIndex;
+
+                // Read the integer up to the first '/' character
+                if (vertexSS >> vertexIndex) {
+                   faces.push_back(vertexIndex);
+				}
+            }
+			if (faces.size()==3){
+				data.tris.push_back(std::vector<int>{faces[0], faces[1], faces[2]});
+			}else{
+				data.tris.push_back(std::vector<int>{faces[0], faces[1], faces[2]});
+				data.tris.push_back(std::vector<int>{faces[0], faces[2], faces[3]});
+			}
+		}
     }
 
     file.close();

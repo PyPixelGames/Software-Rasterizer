@@ -28,8 +28,7 @@ struct Pos2 {
 
 struct FPos2{
 	float x=0.0f;
-	float y=0.0f;
-};
+	float y=0.0f; };
 
 struct Pos3{
 	short int x=0;
@@ -59,13 +58,17 @@ struct Viewport{
 	const float distance=2.0f;
 };
 
-struct Vertex { float x, y, z; };
 struct TextureCoord { float u, v; };
-struct Normal { float x, y, z; };
 
 struct ObjModel{
     std::string objName;
-    std::vector<Vertex> vertices;
+    std::vector<FPos3> vertices;
     std::vector<TextureCoord> texCoords;
-    std::vector<Normal> normals;
+    std::vector<FPos3> normals;
+    std::vector<std::vector<int>> tris;
+};
+
+struct Model{
+	ObjModel model;
+	FPos3 worldPos;
 };
