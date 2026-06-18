@@ -12,8 +12,8 @@ void drawLine(Screen& screen, Pos2 P0, Pos2 P1, uint32_t color){
 			std::swap(P0, P1);
 		}
 
-		std::vector<int> ys = interpolatePoints(P0.x, P0.y, P1.x, P1.y);
-		for (int x=P0.x; x<=P1.x; x++){
+		std::vector<short int> ys = interpolatePoints(P0.x, P0.y, P1.x, P1.y);
+		for (short int x=P0.x; x<=P1.x; x++){
 			changePixel(screen, Pos2{x, ys[x-P0.x]}, color);
 		}
 	}else{
@@ -22,21 +22,21 @@ void drawLine(Screen& screen, Pos2 P0, Pos2 P1, uint32_t color){
 			std::swap(P0, P1);
 		}
 
-		std::vector<int> xs = interpolatePoints(P0.y, P0.x, P1.y, P1.x);
-		for (int y=P0.y; y<=P1.y; y++){
+		std::vector<short int> xs = interpolatePoints(P0.y, P0.x, P1.y, P1.x);
+		for (short int y=P0.y; y<=P1.y; y++){
 			changePixel(screen, Pos2{xs[y-P0.y], y}, color);
 		}
 	}
 }
 
-std::vector<int> interpolatePoints(int l0, int i0, int l1, int i1){
+std::vector<short int> interpolatePoints(short int l0, short int i0, short int l1, short int i1){
 	// the "i" variables are the ones you don't want to interpolate
 	// "l" is for leave me alone
 	if (l0==l1){
 		return {i0};
 	}
 
-	std::vector<int> values;
+	std::vector<short int> values;
 	values.reserve(l1-l0+1);
 	float a = (float)(i1-i0)/(l1-l0);
 	float i = i0;
@@ -78,34 +78,33 @@ void drawFilledTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t colo
 	if (p2.y<p1.y) std::swap(p2, p1);
 
 	// x02 is the long side, x01 and x12 are the shorter sides
-	std::vector<int> x01 = interpolatePoints(p0.y, p0.x, p1.y, p1.x);
-	std::vector<int> x12 = interpolatePoints(p1.y, p1.x, p2.y, p2.x);
-	std::vector<int> x02 = interpolatePoints(p0.y, p0.x, p2.y, p2.x);
+	std::vector<short int> x01 = interpolatePoints(p0.y, p0.x, p1.y, p1.x);
+	std::vector<short int> x12 = interpolatePoints(p1.y, p1.x, p2.y, p2.x);
+	std::vector<short int> x02 = interpolatePoints(p0.y, p0.x, p2.y, p2.x);
 
 	//combine the shorter sides. Don't forget to remove the mutual value
 	x01.pop_back();
-	std::vector<int> x012 = x01;
+	std::vector<short int> x012 = x01;
 	x012.insert(x012.end(), x12.begin(), x12.end());
 
 	// Figure out what side is left and what side is right
-	std::vector<int> x_left;
-	std::vector<int> x_right;
+	std::vector<short int>* x_left;
+	std::vector<short int>* x_right;
 	int m = std::floor(x02.size()/2);
 	if (x02[m] > x012[m]){
-		x_right = x02;
-		x_left = x012;
+		x_right = &x02;
+		x_left = &x012;
 	}else{
-		x_right = x012;
-		x_left = x02;
+		x_right = &x012;
+		x_left = &x02;
 	}
 
 	//draw the horizonral lines (without using the drawLine since that one is very
 	//general and has a lot of quards and work arounds to make any line work. Here we need
 	//only horizontal lines, so it's faster to do it like that).
 	for (int y=p0.y; y<=p2.y; y++){
-		for (int x=x_left[y-p0.y]; x<=x_right[y-p0.y]; x++){
-			changePixel(screen, Pos2{x, y}, color);
-		}
+		uint32_t* row = screen.pixelBuffer.data() + y * screen.width;
+		std::fill(row + (*x_left)[y-p0.y], row + (*x_right)[y-p0.y] + 1, color);
 	}
 }
 
@@ -116,14 +115,13 @@ void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
 	if (p2.y<p0.y) std::swap(p2, p0);
 	if (p2.y<p1.y) std::swap(p2, p1);
 
-	std::vector<int> x01 = interpolatePoints(p0.y, p0.x, p1.y, p1.x);
-	std::vector<int> x12 = interpolatePoints(p1.y, p1.x, p2.y, p2.x);
-	std::vector<int> x02 = interpolatePoints(p0.y, p0.x, p2.y, p2.x);
+	std::vector<short int> x01 = interpolatePoints(p0.y, p0.x, p1.y, p1.x);
+	std::vector<short int> x12 = interpolatePoints(p1.y, p1.x, p2.y, p2.x);
+	std::vector<short int> x02 = interpolatePoints(p0.y, p0.x, p2.y, p2.x);
 
 	x01.pop_back();
-	std::vector<int> x012 = x01;
+	std::vector<short int> x012 = x01;
 	x012.insert(x012.end(), x12.begin(), x12.end());
-
 
     std::vector<float> h01 = interpolatePointsFloat(p0.y, h0, p1.y, h1);
     std::vector<float> h12 = interpolatePointsFloat(p1.y, h1, p2.y, h2);
@@ -133,8 +131,8 @@ void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
     std::vector<float> h012 = h01;
     h012.insert(h012.end(), h12.begin(), h12.end());
 
-	std::vector<int>* x_left;
-	std::vector<int>* x_right;
+	std::vector<short int>* x_left;
+	std::vector<short int>* x_right;
 
 	std::vector<float>* h_left;
 	std::vector<float>* h_right;
@@ -157,19 +155,31 @@ void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
 	// Get rgb of the original color
 	int r, g, b, a;
 	GetColor(color, r, g, b, a);
+	// Precompute as float
+    const float rf = static_cast<float>(r);
+    const float gf = static_cast<float>(g);
+    const float bf = static_cast<float>(b);
+
 
 	for (int y=p0.y; y<=p2.y; y++){
 		int y_idx = y-p0.y;
 		// The goal is to find the value h that gives the shade with (red*h, green*h, blue*h)
 		std::vector<float> h_segments = interpolatePointsFloat(
-				static_cast<float>((*x_left)[y_idx]),
-				(*h_left)[y_idx],
-				static_cast<float>((*x_right)[y_idx]),
-				(*h_right)[y_idx]);
+				static_cast<float>((*x_left)[y_idx]), (*h_left)[y_idx],
+				static_cast<float>((*x_right)[y_idx]), (*h_right)[y_idx]);
+
+		uint32_t* row = screen.pixelBuffer.data() + y * screen.width;
+
 		for (int x=(*x_left)[y_idx]; x<=(*x_right)[y_idx]; x++){
 			int x_idx = x-(*x_left)[y_idx];
 			float h = h_segments[x_idx];
-			changePixel(screen, Pos2{x, y}, Color(r*h, g*h, b*h, 255));
+			// we don't use change pixel for optimization purposes
+			row[x] = Color(
+				static_cast<int>(rf*h),
+				static_cast<int>(gf*h),
+				static_cast<int>(bf*h),
+				255
+			);
 		}
 	}
 }

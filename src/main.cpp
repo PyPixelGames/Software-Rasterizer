@@ -23,7 +23,6 @@ int main(int argc, char* argv[]) {
     bool running = true;
 	uint32_t bgColor = Color(45, 45, 45, 255);
     while (running) {
-
 		drawShadedTriangle(screen, p0, 0.0f, p1, 1.0f, p2, 0.5f, GREEN);
 
 		// render and do some key press checks
@@ -31,7 +30,7 @@ int main(int argc, char* argv[]) {
 		//std::cout << renderer.fps << std::endl;
 
 		//clear the screen
-		std::fill(screen.pixelBuffer.begin(), screen.pixelBuffer.end(), bgColor);
+		screen.clear(bgColor);
 	}
 	std::cout << "Averege FPS: " <<  static_cast<int>(renderer.avgFps) << std::endl;
 
