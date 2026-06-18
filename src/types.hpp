@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <string>
 #include <cstdint>
 #include <cstring>
 
@@ -30,6 +31,18 @@ struct FPos2{
 	float y=0.0f;
 };
 
+struct Pos3{
+	short int x=0;
+	short int y=0;
+	short int z=0;
+};
+
+struct FPos3{
+	float x=0.0f;
+	float y=0.0f;
+	float z=0.0f;
+};
+
 struct Screen {
     const int width = 800;
     const int height = 600;
@@ -38,4 +51,21 @@ struct Screen {
 	void clear(uint32_t color = 0xFF000000U){
         std::fill(pixelBuffer.begin(), pixelBuffer.end(), color);
     }
+};
+
+struct Viewport{
+	const float width=2.0f;
+	const float height=1.5f;
+	const float distance=2.0f;
+};
+
+struct Vertex { float x, y, z; };
+struct TextureCoord { float u, v; };
+struct Normal { float x, y, z; };
+
+struct ObjModel{
+    std::string objName;
+    std::vector<Vertex> vertices;
+    std::vector<TextureCoord> texCoords;
+    std::vector<Normal> normals;
 };

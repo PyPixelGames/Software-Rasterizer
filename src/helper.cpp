@@ -183,3 +183,23 @@ void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
 		}
 	}
 }
+
+FPos2 worldToViewport(Viewport& port, FPos3 pos){
+	return FPos2{(pos.x*port.distance)/pos.z, (pos.y*port.distance)/pos.z};
+}
+
+Pos2 viewportToCanvas(Screen& screen, Viewport& port, FPos2 pos){
+	// We have to add half the width and half the height to our calculation
+	// because the screen's (0, 0) is not in the center of the screen.
+
+    return Pos2{
+        static_cast<short int>((pos.x * screen.width / port.width)
+				+ static_cast<float>(screen.width) / 2),
+        static_cast<short int>((pos.y * screen.height / port.height)
+				+ static_cast<float>(screen.height) / 2)
+    };
+}
+
+Pos2 projectVertex(Screen& screen, Viewport& port, FPos3 v){
+	return viewportToCanvas(screen, port, worldToViewport(port, v));
+}

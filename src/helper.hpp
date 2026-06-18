@@ -14,3 +14,9 @@ void drawFilledTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t colo
 
 void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
 		Pos2 p2, float h2, uint32_t color=WHITE);
+
+FPos2 worldToViewport(Viewport& port, FPos3 pos);
+
+Pos2 viewportToCanvas(Screen& screen, Viewport& port, FPos2 pos);
+
+Pos2 projectVertex(Screen& screen, Viewport& port, FPos3 v);
