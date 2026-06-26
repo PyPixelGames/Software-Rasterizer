@@ -19,6 +19,21 @@ FPos2 worldToViewport(Viewport& port, FPos3 pos);
 
 Pos2 viewportToCanvas(Screen& screen, Viewport& port, FPos2 pos);
 
-Pos2 projectVertex(Screen& screen, Viewport& port, FPos3 v);
+Pos2 projectVertex(Screen& screen, Viewport& port, Vec4 v);
 
-void renderModel(Screen& screen, Viewport& port, Model& model);
+float toRadians(float angle);
+
+Mat4x4 makeRotationY(float degrees);
+
+Mat4x4 makeTranslation(FPos3 pos);
+
+Mat4x4 transpose(Mat4x4 m);
+
+Mat4x4 multiply(Mat4x4 a, Mat4x4 b);
+
+Vec4 multiplyVec4(Mat4x4 mat, Vec4 vec);
+
+void renderScene(Scene& scene, Camera& cam);
+
+void renderModel(Screen& screen, Viewport& port, Model& model,
+		Mat4x4 transform=Identity4x4);

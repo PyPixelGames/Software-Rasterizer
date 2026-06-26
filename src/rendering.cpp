@@ -12,12 +12,9 @@ Renderer::Renderer(int width, int height){
 		std::cerr << "Window/Renderer Creation Error: " << SDL_GetError() << std::endl;
 		return;
 	}
-	SDL_SetRenderVSync(renderer, 0);
+	SDL_SetRenderVSync(renderer, 1);
 
-	SDL_SetRenderLogicalPresentation(renderer, width, height,
-			SDL_LOGICAL_PRESENTATION_LETTERBOX);
-
-	texture = SDL_CreateTexture(renderer,SDL_PIXELFORMAT_XRGB8888,
+	texture = SDL_CreateTexture(renderer,SDL_PIXELFORMAT_ARGB8888,
 			SDL_TEXTUREACCESS_STREAMING,width,height);
 	SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 
@@ -41,16 +38,17 @@ bool Renderer::update(Screen& screen){
     Uint64 frameTicks = now - lastTicks;
     lastTicks = now;
 
-    deltaTime = frameTicks / 1'000'000'000.0f;
-	fps = 1'000'000'000.0f / frameTicks;
-	avgFpsCounter+=fps;
-	counter++;
+    if (frameTicks > 0) {
+        deltaTime = frameTicks / 1'000'000'000.0f;
+        fps       = 1'000'000'000.0f / frameTicks;
+    }
 
-	if (counter == avgFpsCycles){
-		counter=0;
-		avgFps=avgFpsCounter/avgFpsCycles;
-		avgFpsCounter=0;
-	}
+	fpsSamples[fpsHead] = fps;
+    fpsHead = (fpsHead + 1) % AVG_FPS_WINDOW;
+
+    float sum = 0.0f;
+    for (float s : fpsSamples) sum += s;
+    avgFps = sum / AVG_FPS_WINDOW;
 
 	bool running = true;
 	SDL_Event event;
@@ -86,7 +84,6 @@ bool Renderer::update(Screen& screen){
 		SDL_UnlockTexture(texture);
 	}
 
-	SDL_RenderClear(renderer);
 	SDL_RenderTexture(renderer, texture, nullptr, nullptr);
 	SDL_RenderPresent(renderer);
 	return running;

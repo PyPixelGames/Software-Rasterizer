@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdint>
 #include <cstring>
+#include <array>
 
 inline uint32_t BLACK = 0xFF000000u;
 inline uint32_t WHITE = 0xFFFFFFFFu;
@@ -42,6 +43,13 @@ struct FPos3{
 	float z=0.0f;
 };
 
+struct Vec4{
+	float x=0;
+	float y=0;
+	float z=0;
+	float w=0;
+};
+
 struct Screen {
     const int width = 800;
     const int height = 600;
@@ -68,7 +76,25 @@ struct ObjModel{
     std::vector<std::vector<int>> tris;
 };
 
+using Mat4x4 = std::array<std::array<float, 4>, 4>;
+constexpr Mat4x4 Identity4x4 = Mat4x4{{{1, 0, 0, 0}, {0, 1, 0, 0},
+						   {0, 0, 1, 0}, {0, 0, 0, 1}}};
+
 struct Model{
 	ObjModel model;
 	FPos3 worldPos;
+	Mat4x4 transform = Identity4x4;
+};
+
+struct Camera{
+	FPos3 position={0, 0, 0};
+	Mat4x4 transform = Identity4x4;
+};
+
+struct Scene{
+	Screen screen;
+	Viewport port;
+
+	std::vector<Model> models;
+	uint32_t bgColor = Color(45, 45, 45, 255);
 };

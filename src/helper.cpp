@@ -195,30 +195,99 @@ Pos2 viewportToCanvas(Screen& screen, Viewport& port, FPos2 pos){
 	// because the screen's (0, 0) is not in the center of the screen.
 
     return Pos2{
-        static_cast<short int>((pos.x * screen.width / port.width)
-				+ static_cast<float>(screen.width) / 2),
-        static_cast<short int>((pos.y * screen.height / port.height)
-				+ static_cast<float>(screen.height) / 2)
+        static_cast<short int>(
+				std::round((pos.x * screen.width /port.width)
+					+ static_cast<float>(screen.width) / 2)),
+        static_cast<short int>(
+				std::round((pos.y * screen.height / port.height)
+				+ static_cast<float>(screen.height) / 2))
     };
 }
 
-Pos2 projectVertex(Screen& screen, Viewport& port, FPos3 v){
-	return viewportToCanvas(screen, port, worldToViewport(port, v));
+Pos2 projectVertex(Screen& screen, Viewport& port, Vec4 v){
+	return viewportToCanvas(screen, port, worldToViewport(port,
+				{v.x,v.y,v.z}));
 }
 
-void renderModel(Screen& screen, Viewport& port, Model& model){
+float toRadians(float angle){
+	return angle * (M_PI / 180.0f);
+}
+
+Mat4x4 makeRotationY(float degrees) {
+    float a = toRadians(degrees);
+    float s = std::sin(a);
+    float c = std::cos(a);
+    return {{
+        { c,  0, s, 0},
+        { 0,  1, 0, 0},
+        {-s,  0, c, 0},
+        { 0,  0, 0, 1}
+    }};
+}
+
+Mat4x4 makeTranslation(FPos3 pos){
+    Mat4x4 m = Identity4x4;
+    m[0][3] = pos.x;
+    m[1][3] = pos.y;
+    m[2][3] = pos.z;
+    return m;
+}
+
+Mat4x4 transpose(Mat4x4 m) {
+    Mat4x4 result{};
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++)
+            result[i][j] = m[j][i];
+    return result;
+}
+
+Mat4x4 multiply(Mat4x4 a, Mat4x4 b) {
+    Mat4x4 result{};
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++)
+            for (int k = 0; k < 4; k++)
+                result[i][j] += a[i][k] * b[k][j];
+    return result;
+}
+
+Vec4 multiplyVec4(Mat4x4 mat, Vec4 vec){
+	return {
+        mat[0][0]*vec.x + mat[0][1]*vec.y +
+				mat[0][2]*vec.z + mat[0][3]*vec.w,
+        mat[1][0]*vec.x + mat[1][1]*vec.y +
+				mat[1][2]*vec.z + mat[1][3]*vec.w,
+        mat[2][0]*vec.x + mat[2][1]*vec.y +
+				mat[2][2]*vec.z + mat[2][3]*vec.w,
+        mat[3][0]*vec.x + mat[3][1]*vec.y +
+				mat[3][2]*vec.z + mat[3][3]*vec.w,
+    };
+}
+
+void renderModel(Screen& screen, Viewport& port, Model& model,
+		Mat4x4 transform){
 	std::vector<Pos2> screenPoints;
 	for (auto tri : model.model.tris){
 		screenPoints.clear();
 		for (int idx: tri){
-			FPos3 vert = {
-				model.model.vertices[idx-1].x+model.worldPos.x,
-				model.model.vertices[idx-1].y+model.worldPos.y,
-				model.model.vertices[idx-1].z+model.worldPos.z,
+			Vec4 vert = {
+				model.model.vertices[idx-1].x,
+				model.model.vertices[idx-1].y,
+				model.model.vertices[idx-1].z,
+				1
 			};
 
-			screenPoints.push_back(projectVertex(screen, port, vert));
+			screenPoints.push_back(projectVertex(screen, port, multiplyVec4(transform, vert)));
 		}
 		drawWireframeTriangle(screen, screenPoints[0], screenPoints[1], screenPoints[2]);
+	}
+}
+
+void renderScene(Scene& scene, Camera& cam){
+	scene.screen.clear(scene.bgColor);
+
+	for (auto model: scene.models){
+		Mat4x4 translation = makeTranslation(model.worldPos);
+        Mat4x4 combined = multiply(translation, model.transform);
+		renderModel(scene.screen, scene.port, model, combined);
 	}
 }

@@ -14,9 +14,9 @@ class Renderer{
 		float fps;
 		float deltaTime;
 		float avgFps=0;
-		float avgFpsCounter;
-		int avgFpsCycles=50;
-		int counter=0;
+		static constexpr int AVG_FPS_WINDOW = 60;
+		float fpsSamples[AVG_FPS_WINDOW] = {};
+		int fpsHead = 0;
 
 		Renderer(int width, int height);
 		~Renderer();

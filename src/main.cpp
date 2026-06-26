@@ -11,25 +11,30 @@ int main(int argc, char* argv[]) {
 	std::random_device rd;
     std::mt19937 rng(rd());
 
-	Screen screen;
-	Viewport port;
-	Renderer renderer(screen.width, screen.height);
+	Scene scene;
+	Camera cam;
+	Renderer renderer(scene.screen.width, scene.screen.height);
 
 	ObjModel cubeOBJ = parseObjHeader("src/models/testcube.obj");
+
 	Model cube1 {cubeOBJ, FPos3{-1.5f, -0.5f, 5.0f}};
+	float angle=0;
+	cube1.transform = multiply(cube1.transform, makeRotationY(angle));
+
+	scene.models.push_back(cube1);
 
     bool running = true;
-	uint32_t bgColor = Color(45, 45, 45, 255);
 	while (running) {
-
-		renderModel(screen, port, cube1);
+		scene.models[0].transform = multiply(Identity4x4,
+				makeRotationY(angle));
+		angle+=0.5;
+		renderScene(scene, cam);
 
 		// render and do some key press checks
-		if (renderer.update(screen)==false) running=false;
+		if (renderer.update(scene.screen)==false) running=false;
 		//std::cout << renderer.fps << std::endl;
 
 		//clear the screen
-		screen.clear(bgColor);
 	}
 	std::cout << "Averege FPS: " <<  static_cast<int>(renderer.avgFps) << std::endl;
 
