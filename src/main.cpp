@@ -15,8 +15,8 @@ int main(int argc, char* argv[]) {
 	Camera cam (90, 800.0f/600.0f);
 	Renderer renderer(scene.screen.width, scene.screen.height);
 
-	ObjModel modelOBJ = parseObjHeader("src/models/testcube.obj");
-	//ObjModel modelOBJ = parseObjHeader("src/models/complextest.obj");
+	//ObjModel modelOBJ = parseObjHeader("src/models/testcube.obj");
+	ObjModel modelOBJ = parseObjHeader("src/models/complextest.obj");
 
 	//Model model {modelOBJ, FPos3{-1.5f, -0.5f, 5.0f}};
 	Model model {modelOBJ, FPos3{0.0f, -0.5f, 1.5f}};
