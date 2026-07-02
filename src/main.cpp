@@ -12,22 +12,26 @@ int main(int argc, char* argv[]) {
     std::mt19937 rng(rd());
 
 	Scene scene;
-	Camera cam;
+	Camera cam (90, 800.0f/600.0f);
 	Renderer renderer(scene.screen.width, scene.screen.height);
 
-	ObjModel cubeOBJ = parseObjHeader("src/models/testcube.obj");
+	ObjModel modelOBJ = parseObjHeader("src/models/testcube.obj");
+	//ObjModel modelOBJ = parseObjHeader("src/models/complextest.obj");
 
-	Model cube1 {cubeOBJ, FPos3{-1.5f, -0.5f, 5.0f}};
+	//Model model {modelOBJ, FPos3{-1.5f, -0.5f, 5.0f}};
+	Model model {modelOBJ, FPos3{0.0f, -0.5f, 1.5f}};
 	float angle=0;
-	cube1.transform = multiply(cube1.transform, makeRotationY(angle));
+	model.transform = multiply(model.transform, makeRotationY(angle));
 
-	scene.models.push_back(cube1);
+	scene.models.push_back(model);
 
     bool running = true;
 	while (running) {
-		scene.models[0].transform = multiply(Identity4x4,
-				makeRotationY(angle));
-		angle+=0.5;
+		//scene.models[0].worldPos.x -= 1*renderer.deltaTime;
+		angle+=30*renderer.deltaTime;
+
+		scene.models[0].transform = multiply(Identity4x4, makeRotationY(angle));
+
 		renderScene(scene, cam);
 
 		// render and do some key press checks

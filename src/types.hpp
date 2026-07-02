@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <array>
+#include <cmath>
 
 inline uint32_t BLACK = 0xFF000000u;
 inline uint32_t WHITE = 0xFFFFFFFFu;
@@ -21,6 +22,17 @@ inline void GetColor(uint32_t color, int& r, int& g, int& b, int& a) {
     b = (color)       & 0xFF;
     a = (color >> 24) & 0xFF;
 }
+
+enum ClipState{
+	Outside=0,
+	Intersect=1,
+	Inside=2,
+};
+
+struct Clip{
+	ClipState state = ClipState::Inside;
+	std::vector<int> intersectedIndexes;
+};
 
 struct Pos2 {
 	short int x=0;
@@ -61,9 +73,18 @@ struct Screen {
 };
 
 struct Viewport{
-	const float width=2.0f;
-	const float height=1.5f;
-	const float distance=2.0f;
+    float fovDegrees = 60.0f;
+    float distance = 1.0f;
+    float width;
+    float height;
+
+    Viewport(float fov = 60.0f, float aspect = 800.0f/600.0f)
+        : fovDegrees(fov)
+    {
+        float halfFovRad = (fovDegrees / 2.0f) * (M_PI / 180.0f);
+        width  = 2.0f * distance * std::tan(halfFovRad);
+        height = width / aspect;
+    }
 };
 
 struct TextureCoord { float u, v; };
@@ -74,26 +95,53 @@ struct ObjModel{
     std::vector<TextureCoord> texCoords;
     std::vector<FPos3> normals;
     std::vector<std::vector<int>> tris;
+	float sphere_radius;
+	FPos3 sphere_center;
 };
 
 using Mat4x4 = std::array<std::array<float, 4>, 4>;
 constexpr Mat4x4 Identity4x4 = Mat4x4{{{1, 0, 0, 0}, {0, 1, 0, 0},
 						   {0, 0, 1, 0}, {0, 0, 0, 1}}};
-
 struct Model{
 	ObjModel model;
 	FPos3 worldPos;
 	Mat4x4 transform = Identity4x4;
 };
 
+struct Plane{
+	FPos3 normal;
+	float D;
+};
+
 struct Camera{
-	FPos3 position={0, 0, 0};
-	Mat4x4 transform = Identity4x4;
+    FPos3 position={0, 0, 0};
+    Viewport port;
+    Mat4x4 transform = Identity4x4;
+
+    Plane near, left, right, bottom, top;
+    std::vector<Plane> planes;
+	float nearClip = 0.1f;
+
+    Camera(float fovDegrees = 90.0f, float aspect = 800.0f/600.0f) : port(fovDegrees, aspect){
+        float halfW = port.width / 2.0f;
+        float halfH = port.height / 2.0f;
+        float d = port.distance;
+
+        float leftLen = std::sqrt(d*d + halfW*halfW);
+        float topLen  = std::sqrt(d*d + halfH*halfH);
+
+        near   = Plane{{0, 0, 1}, -nearClip};
+        left   = Plane{{ d/leftLen, 0, halfW/leftLen}, 0};
+        right  = Plane{{-d/leftLen, 0, halfW/leftLen}, 0};
+        bottom = Plane{{0,  d/topLen, halfH/topLen}, 0};
+        top    = Plane{{0, -d/topLen, halfH/topLen}, 0};
+
+        planes = {near, left, right, bottom, top};
+    }
 };
 
 struct Scene{
 	Screen screen;
-	Viewport port;
 
 	std::vector<Model> models;
 	uint32_t bgColor = Color(45, 45, 45, 255);

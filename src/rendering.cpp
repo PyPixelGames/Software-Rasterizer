@@ -12,7 +12,7 @@ Renderer::Renderer(int width, int height){
 		std::cerr << "Window/Renderer Creation Error: " << SDL_GetError() << std::endl;
 		return;
 	}
-	SDL_SetRenderVSync(renderer, 1);
+	SDL_SetRenderVSync(renderer, 0);
 
 	texture = SDL_CreateTexture(renderer,SDL_PIXELFORMAT_ARGB8888,
 			SDL_TEXTUREACCESS_STREAMING,width,height);

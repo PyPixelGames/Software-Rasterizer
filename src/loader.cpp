@@ -71,6 +71,29 @@ ObjModel parseObjHeader(const std::string& filename) {
 		}
     }
 
+	FPos3 avg;
+	for (auto v: data.vertices){
+		avg.x += v.x;
+		avg.y += v.y;
+		avg.z += v.z;
+	}
+	avg.x = avg.x/size(data.vertices);
+	avg.y = avg.y/size(data.vertices);
+	avg.z = avg.z/size(data.vertices);
+
+	float r = 0;
+	for (auto v: data.vertices){
+		float dis = std::sqrt(
+				(std::pow((v.x-avg.x), 2))+
+				(std::pow((v.y-avg.y), 2))+
+				(std::pow((v.z-avg.z), 2)));
+		r = std::max(r, dis);
+	}
+
+	data.sphere_radius = r;
+	data.sphere_center = avg;
+	std::cout << r << std::endl;
+
     file.close();
     return data;
 }
