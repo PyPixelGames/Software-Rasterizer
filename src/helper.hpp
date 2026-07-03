@@ -8,9 +8,18 @@ void drawLine(Screen& screen, Pos2 P0, Pos2 P1, uint32_t color=WHITE);
 
 std::vector<short int> interpolatePoints(short int i0, short int o0, short int i1, short int o1);
 
+void edgeInterpolate(short int l0, short int i0, short int l1, short int i1,
+		short int l2, short int i2, std::vector<short int>& v02, std::vector<short int>& v012);
+
+std::vector<float> interpolatePointsFloat(float l0, float i0, float l1, float i1);
+
+void edgeInterpolateFloat(short int l0, float i0, short int l1, float i1,
+		short int l2, float i2, std::vector<float>& v02, std::vector<float>& v012);
+
 void drawWireframeTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color=WHITE);
 
-void drawFilledTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color=WHITE);
+void drawFilledTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color,
+		std::vector<float> zs);
 
 void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
 		Pos2 p2, float h2, uint32_t color=WHITE);

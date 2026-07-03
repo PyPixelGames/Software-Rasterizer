@@ -5,16 +5,42 @@
 #include <cstring>
 #include <array>
 #include <cmath>
+#include <climits>
+
+inline uint32_t Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255){
+    return (a << 24) | (r << 16) | (g << 8) | b;
+}
 
 inline uint32_t BLACK = 0xFF000000u;
 inline uint32_t WHITE = 0xFFFFFFFFu;
 inline uint32_t GREEN = 0xFF00FF00u;
 inline uint32_t BLUE = 0xFF0000FFu;
 inline uint32_t RED = 0xFFFF0000u;
+inline uint32_t LIGHT_GREY   = Color(220, 220, 220);
+inline uint32_t GREY         = Color(128, 128, 128);
+inline uint32_t DARK_GREY    = Color(220, 220, 220);
+inline uint32_t PINK         = Color(225, 96, 208);
+inline uint32_t PURPLE       = Color(160, 32, 255);
+inline uint32_t LIGHT_BLUE   = Color(80, 208, 225);
+inline uint32_t YELLOW_GREEN = Color(96, 225, 128);
+inline uint32_t YELLOW       = Color(225, 224, 32);
+inline uint32_t ORANGE       = Color(225, 160, 16);
+inline uint32_t BROWN        = Color(140, 108, 76);
+inline uint32_t PALE         = Color(225, 208, 160);
 
-inline uint32_t Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255){
-    return (a << 24) | (r << 16) | (g << 8) | b;
-}
+inline std::vector<uint32_t> Colors = {
+	GREEN,
+	BLUE,
+	RED,
+	PINK,
+	PURPLE,
+	LIGHT_BLUE,
+	YELLOW,
+	BROWN,
+	PALE,
+	YELLOW_GREEN,
+	ORANGE
+};
 
 inline void GetColor(uint32_t color, int& r, int& g, int& b, int& a) {
     r = (color >> 16) & 0xFF;
@@ -65,10 +91,13 @@ struct Vec4{
 struct Screen {
     const int width = 800;
     const int height = 600;
+
 	std::vector<uint32_t> pixelBuffer = std::vector<uint32_t>(width * height, 0xFF000000U);
+	std::vector<float> depthBuffer = std::vector<float>(width*height, 0.0f);
 
 	void clear(uint32_t color = 0xFF000000U){
         std::fill(pixelBuffer.begin(), pixelBuffer.end(), color);
+        std::fill(depthBuffer.begin(), depthBuffer.end(), 0.0f);
     }
 };
 

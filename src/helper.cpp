@@ -5,6 +5,16 @@ inline Vec4 F3ToVec4(FPos3 p){
 	return {p.x, p.y, p.z, 1};
 }
 
+inline FPos3 cross(FPos3 a, FPos3 b){
+	return { a.y*b.z - a.z*b.y,
+	         a.z*b.x - a.x*b.z,
+	         a.x*b.y - a.y*b.x };
+}
+
+inline float dot(FPos3 a, FPos3 b){
+	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
 void changePixel(Screen& screen, Pos2 pos, uint32_t color){
 	if (pos.x < 0 || pos.x >= screen.width ||
         pos.y < 0 || pos.y >= screen.height) return;
@@ -53,6 +63,17 @@ std::vector<short int> interpolatePoints(short int l0, short int i0, short int l
 	return values;
 }
 
+void edgeInterpolate(short int l0, short int i0, short int l1, short int i1,
+		short int l2, short int i2, std::vector<short int>& v02, std::vector<short int>& v012){
+	std::vector<short int> t01 = interpolatePoints(l0, i0, l1, i1);
+	std::vector<short int> t12 = interpolatePoints(l1, i1, l2, i2);
+	std::vector<short int> t02 = interpolatePoints(l0, i0, l2, i2);
+	t01.pop_back();
+	v012 = t01;
+	v012.insert(v012.end(), t12.begin(), t12.end());
+	v02 = t02;
+}
+
 std::vector<float> interpolatePointsFloat(float l0, float i0, float l1, float i1){
 	// the "i" variables are the ones you don't want to interpolate
 	// "l" is for leave me alone
@@ -71,50 +92,76 @@ std::vector<float> interpolatePointsFloat(float l0, float i0, float l1, float i1
 	return values;
 }
 
+void edgeInterpolateFloat(short int l0, float i0, short int l1, float i1,
+		short int l2, float i2, std::vector<float>& v02, std::vector<float>& v012){
+	std::vector<float> t01 = interpolatePointsFloat(l0, i0, l1, i1);
+	std::vector<float> t12 = interpolatePointsFloat(l1, i1, l2, i2);
+	std::vector<float> t02 = interpolatePointsFloat(l0, i0, l2, i2);
+	t01.pop_back();
+	v012 = t01;
+	v012.insert(v012.end(), t12.begin(), t12.end());
+	v02 = t02;
+}
+
 void drawWireframeTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color){
 	drawLine(screen, p0, p1, color);
 	drawLine(screen, p0, p2, color);
 	drawLine(screen, p2, p1, color);
 }
 
-void drawFilledTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color){
+void drawFilledTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color,
+		std::vector<float> zs){
 	if (p1.y<p0.y) std::swap(p1, p0);
 	if (p2.y<p0.y) std::swap(p2, p0);
 	if (p2.y<p1.y) std::swap(p2, p1);
 
-	std::vector<short int> x01 = interpolatePoints(p0.y, p0.x, p1.y, p1.x);
-	std::vector<short int> x12 = interpolatePoints(p1.y, p1.x, p2.y, p2.x);
-	std::vector<short int> x02 = interpolatePoints(p0.y, p0.x, p2.y, p2.x);
+	std::vector<short int> x02, x012;
+	std::vector<float> iz02, iz012;
+	edgeInterpolate(p0.y, p0.x, p1.y, p1.x, p2.y, p2.x, x02, x012);
+	edgeInterpolateFloat(p0.y, zs[0], p1.y, zs[1], p2.y, zs[2], iz02, iz012);
 
-	x01.pop_back();
-	std::vector<short int> x012 = x01;
-	x012.insert(x012.end(), x12.begin(), x12.end());
+	std::vector<short int> *x_left, *x_right;
+	std::vector<float> *iz_left, *iz_right;
 
-	std::vector<short int>* x_left;
-	std::vector<short int>* x_right;
 	int m = std::floor(x02.size()/2);
 	if (x02[m] > x012[m]){
-		x_right = &x02;
-		x_left = &x012;
+		x_right = &x02;   x_left = &x012;
+		iz_right = &iz02; iz_left = &iz012;
 	}else{
-		x_right = &x012;
-		x_left = &x02;
+		x_right = &x012;  x_left = &x02;
+		iz_right = &iz012; iz_left = &iz02;
 	}
 
 	int yStart = std::max((int)p0.y, 0);
-	int yEnd = std::min((int)p2.y, screen.height - 1);
+	int yEnd   = std::min((int)p2.y, screen.height - 1);
 
 	for (int y=yStart; y<=yEnd; y++){
-		int idx = y - p0.y;
-		int xL = std::max((int)(*x_left)[idx], 0);
-		int xR = std::min((int)(*x_right)[idx], screen.width - 1);
+		int y_idx = y - p0.y;
+
+		int rawL = (*x_left)[y_idx];
+		int rawR = (*x_right)[y_idx];
+		if (rawL > rawR) continue;
+
+		float zL = (*iz_left)[y_idx];
+		float zR = (*iz_right)[y_idx];
+		float dz = (rawR != rawL) ? (zR - zL) / (rawR - rawL) : 0.0f;
+
+		int xL = std::max(rawL, 0);
+		int xR = std::min(rawR, screen.width - 1);
 		if (xL > xR) continue;
 
-		uint32_t* row = screen.pixelBuffer.data() + y * screen.width;
-		std::fill(row + xL, row + xR + 1, color);
+		float z = zL + dz * (xL - rawL);   // step z to the clamped start
+		float* depthRow = screen.depthBuffer.data() + y * screen.width;
+		uint32_t* pixRow = screen.pixelBuffer.data() + y * screen.width;
+
+		for (int x=xL; x<=xR; x++, z+=dz){
+			if (z > depthRow[x]){
+				pixRow[x] = color;
+				depthRow[x] = z;
+			}
+		}
 	}
 }
-
 void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
 		Pos2 p2, float h2, uint32_t color){
 	if (p1.y<p0.y) std::swap(p1, p0);
@@ -350,18 +397,24 @@ void renderModel(Screen& screen, Camera& cam, Model& model, Mat4x4 transform){
 		}
 
 		if (poly.size() >= 3){
+			FPos3 e1{poly[1].x-poly[0].x, poly[1].y-poly[0].y, poly[1].z-poly[0].z};
+			FPos3 e2{poly[2].x-poly[0].x, poly[2].y-poly[0].y, poly[2].z-poly[0].z};
+			FPos3 normal = cross(e1, e2);
+
+			FPos3 viewDir = poly[0];
+
+			if (dot(normal, viewDir) >= 0.0f){
+				continue; //Back-face culling
+			}
+
 			// fan-triangulate: (poly[0], poly[i], poly[i+1]) for i in 1..poly.size()-2
 			for (size_t i = 1; i+1 < poly.size(); i++){
-				drawWireframeTriangle(screen,
+				drawFilledTriangle(screen,
 						projectVertex(screen, cam.port, F3ToVec4(poly[0])),
 						projectVertex(screen, cam.port, F3ToVec4(poly[i])),
-						projectVertex(screen, cam.port, F3ToVec4(poly[i+1])));
-
-				//drawShadedTriangle(screen,
-						//projectVertex(screen, cam.port, F3ToVec4(poly[0])), 0.0f,
-						//projectVertex(screen, cam.port, F3ToVec4(poly[i])), 1.0f,
-						//projectVertex(screen, cam.port, F3ToVec4(poly[i+1])), 0.5f,
-						//GREEN);
+						projectVertex(screen, cam.port, F3ToVec4(poly[i+1])),
+						Colors[tri[0]%std::size(Colors)],
+						{1.0f/poly[0].z, 1.0f/poly[i].z, 1.0f/poly[i+1].z});
 			}
 		}
 	}
