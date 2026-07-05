@@ -118,9 +118,28 @@ struct Viewport{
 
 struct TextureCoord { float u, v; };
 
+struct Vertex {
+    FPos3 pos;
+    TextureCoord uv;
+};
+
+struct Texture {
+    int width, height;
+    std::vector<uint32_t> pixels;
+
+    uint32_t sample(float u, float v) const {
+        u = u - std::floor(u);
+        v = v - std::floor(v);
+        int x = std::min((int)(u * width),  width  - 1);
+        int y = std::min((int)((1.0f-v) * height), height - 1); // flip v if needed
+        return pixels[y*width + x];
+    }
+};
+
 struct ObjModel{
     std::string objName;
     std::vector<FPos3> vertices;
+    std::vector<std::vector<int>> triTexCoords;
     std::vector<TextureCoord> texCoords;
     std::vector<FPos3> normals;
     std::vector<std::vector<int>> tris;
@@ -135,6 +154,7 @@ struct Model{
 	ObjModel model;
 	FPos3 worldPos;
 	Mat4x4 transform = Identity4x4;
+	Texture texture;
 };
 
 struct Plane{

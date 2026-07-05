@@ -15,6 +15,7 @@ add_executable(${APP_NAME}
     src/rendering.cpp
 	src/helper.cpp
 	src/loader.cpp
+	src/stb_image.h
 )
 
 target_include_directories(SoRas PRIVATE

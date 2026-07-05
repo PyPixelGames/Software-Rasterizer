@@ -1,4 +1,7 @@
 #include "loader.hpp"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 
 ObjModel parseObjHeader(const std::string& filename) {
     std::ifstream file(filename);
@@ -46,30 +49,30 @@ ObjModel parseObjHeader(const std::string& filename) {
             data.normals.push_back(vn);
         }
 		// Faces
+		// Faces
 		else if (prefix == "f"){
-			// get the first nu,bers of a sentance like this:
-			// f 2/1/1 1/2/1 3/3/1 4/4/1
-			// and get all the first numbers as intagers (2, 1, 3, 4)
-
 			std::string vertexStr;
-			faces.clear();
-            while (ss >> vertexStr) {
-                std::stringstream vertexSS(vertexStr);
-                int vertexIndex;
-
-                // Read the integer up to the first '/' character
-                if (vertexSS >> vertexIndex) {
-                   faces.push_back(vertexIndex);
+			std::vector<int> vIdx, vtIdx;
+			while (ss >> vertexStr) {
+				int v=0, vt=0, vn=0;
+				// format can be v, v/vt, v/vt/vn, or v//vn
+				size_t p1 = vertexStr.find('/');
+				v = std::stoi(vertexStr.substr(0, p1));
+				if (p1 != std::string::npos) {
+					size_t p2 = vertexStr.find('/', p1+1);
+					std::string vtStr = vertexStr.substr(p1+1, p2-p1-1);
+					if (!vtStr.empty()) vt = std::stoi(vtStr);
 				}
-            }
-			if (faces.size()==3){
-				data.tris.push_back(std::vector<int>{faces[0], faces[1], faces[2]});
-			}else{
-				data.tris.push_back(std::vector<int>{faces[0], faces[1], faces[2]});
-				data.tris.push_back(std::vector<int>{faces[0], faces[2], faces[3]});
+				vIdx.push_back(v);
+				vtIdx.push_back(vt);
+			}
+			// triangulate both vIdx and vtIdx in parallel (fan)
+			for (size_t i=1; i+1<vIdx.size(); i++){
+				data.tris.push_back({vIdx[0], vIdx[i], vIdx[i+1]});
+				data.triTexCoords.push_back({vtIdx[0], vtIdx[i], vtIdx[i+1]});
 			}
 		}
-    }
+	}
 
 	FPos3 avg;
 	for (auto v: data.vertices){
@@ -96,4 +99,20 @@ ObjModel parseObjHeader(const std::string& filename) {
 
     file.close();
     return data;
+}
+
+Texture loadTexture(const std::string& path){
+    int w, h, ch;
+    unsigned char* data = stbi_load(path.c_str(), &w, &h, &ch, 4);
+    if (!data){
+        std::cerr << "Failed to load texture: " << path << " (" << stbi_failure_reason() << ")" << std::endl;
+        return Texture{0, 0, {}};
+    }
+    Texture tex{w, h, std::vector<uint32_t>(w*h)};
+    for (int i = 0; i < w*h; i++){
+        uint8_t r=data[i*4+0], g=data[i*4+1], b=data[i*4+2], a=data[i*4+3];
+        tex.pixels[i] = Color(r,g,b,a);
+    }
+    stbi_image_free(data);
+    return tex;
 }

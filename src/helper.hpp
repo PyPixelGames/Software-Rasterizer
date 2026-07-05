@@ -1,6 +1,7 @@
 #pragma once
 #include "types.hpp"
 #include <cmath>
+#include <cstdlib>
 
 void changePixel(Screen& screen, Pos2 pos, uint32_t color);
 
@@ -21,6 +22,9 @@ void drawWireframeTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t c
 void drawFilledTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color,
 		std::vector<float> zs);
 
+void drawTexturedTriangle(Screen& screen, const Texture& tex, Pos2 p0, Pos2 p1, Pos2 p2,
+                           std::vector<float> zs, std::vector<float> us, std::vector<float> vs);
+
 void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
 		Pos2 p2, float h2, uint32_t color=WHITE);
 
@@ -34,7 +38,7 @@ float toRadians(float angle);
 
 float PlaneToPointSignedDistance(Plane plane, FPos3 point);
 
-std::vector<FPos3> TriToF3(std::vector<int> tri, Model& model, Mat4x4 transform);
+std::vector<Vertex> TriToF3(std::vector<int> tri, std::vector<int> texTri, Model& model, Mat4x4 transform);
 
 Mat4x4 makeRotationY(float degrees);
 
