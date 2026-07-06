@@ -18,6 +18,8 @@ class Renderer{
 		float fpsSamples[AVG_FPS_WINDOW] = {};
 		int fpsHead = 0;
 
+		bool isFullscreen = false;
+
 		Renderer(int width, int height);
 		~Renderer();
 		bool update(Screen& screen);

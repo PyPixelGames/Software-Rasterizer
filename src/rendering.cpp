@@ -13,6 +13,7 @@ Renderer::Renderer(int width, int height){
 		return;
 	}
 	SDL_SetRenderVSync(renderer, 0);
+	SDL_SetRenderLogicalPresentation(renderer, width, height, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
 	texture = SDL_CreateTexture(renderer,SDL_PIXELFORMAT_ARGB8888,
 			SDL_TEXTUREACCESS_STREAMING,width,height);
@@ -58,6 +59,10 @@ bool Renderer::update(Screen& screen){
 		}
 		if (event.type == SDL_EVENT_KEY_DOWN){
 			if (event.key.key == SDLK_ESCAPE) running=false;
+			if (event.key.key == SDLK_F && !event.key.repeat){
+				isFullscreen = !isFullscreen;
+				SDL_SetWindowFullscreen(window, isFullscreen);
+			}
 		}
 	}
 

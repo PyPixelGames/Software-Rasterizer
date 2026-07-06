@@ -23,6 +23,23 @@ inline Vertex lerp(Vertex a, Vertex b, float t){
     };
 }
 
+inline FPos3 normalize(FPos3 v){
+    float len = std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+    if (len < 1e-6f) return {0,0,0};
+    return {v.x/len, v.y/len, v.z/len};
+}
+
+inline constexpr float kAmbient = 0.25f;
+
+inline uint32_t applyLightRGB(uint32_t color, float lr, float lg, float lb){
+    int r, g, b, a;
+    GetColor(color, r, g, b, a);
+    r = std::clamp(static_cast<int>(r * lr), 0, 255);
+    g = std::clamp(static_cast<int>(g * lg), 0, 255);
+    b = std::clamp(static_cast<int>(b * lb), 0, 255);
+    return Color((uint8_t)r, (uint8_t)g, (uint8_t)b, (uint8_t)a);
+}
+
 inline bool isLineTriangle(Pos2 a, Pos2 b, Pos2 c){
     int minX = std::min({a.x, b.x, c.x});
     int maxX = std::max({a.x, b.x, c.x});
@@ -358,8 +375,8 @@ std::vector<Vertex> ClipPolygonPlane(std::vector<Vertex> poly, Plane plane){
     return out;
 }
 
-void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam,
-                           Model& model, Mat4x4 transform, RasterPool& pool) {
+void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam, Model& model,
+		Mat4x4 transform, RasterPool& pool, const std::vector<Light>& lights){
     Clip clip = ClipModelPlane(model, cam, transform);
     if (clip.state == ClipState::Outside) return;
 
@@ -390,6 +407,12 @@ void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam,
 
                 if (dot(normal, viewDir) >= 0.0f) continue; // Back-face culling
 
+				// Lighting
+				FPos3 n = normalize(normal);
+				FPos3 worldPos = poly[0].pos;
+				float lr, lg, lb;
+				accumulateLighting(n, worldPos, lights, lr, lg, lb);
+
                 for (size_t i = 1; i + 1 < poly.size(); i++) {
                     Pos2 p0 = projectVertex(screen, cam.port, F3ToVec4(poly[0].pos));
                     Pos2 p1 = projectVertex(screen, cam.port, F3ToVec4(poly[i].pos));
@@ -409,7 +432,8 @@ void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam,
                         poly[0].uv.v*iz0, poly[i].uv.v*izI, poly[i+1].uv.v*izI1,
                         &model.texture,
                         std::min({(int)p0.y, (int)p1.y, (int)p2.y}),
-                        std::max({(int)p0.y, (int)p1.y, (int)p2.y})
+                        std::max({(int)p0.y, (int)p1.y, (int)p2.y}),
+						lr, lg, lb // Also lighting
                     };
 
                     perThreadOut[threadIdx].push_back(job);
@@ -427,6 +451,41 @@ void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam,
     }
 }
 
+void accumulateLighting(FPos3 n, FPos3 worldPos, const std::vector<Light>& lights,
+                                float& outR, float& outG, float& outB){
+    outR = outG = outB = kAmbient;
+
+    for (const auto& light : lights){
+        FPos3 lightDir;
+        float atten = 1.0f;
+
+        if (light.type == LightType::Directional){
+            lightDir = normalize(light.direction);
+        } else { // Point
+            FPos3 toLight{ light.position.x - worldPos.x,
+                            light.position.y - worldPos.y,
+                            light.position.z - worldPos.z };
+            float dist = std::sqrt(dot(toLight, toLight));
+            if (dist < 1e-6f) continue;
+            lightDir = { toLight.x/dist, toLight.y/dist, toLight.z/dist };
+            atten = std::max(0.0f, 1.0f - dist / light.range); // simple linear falloff
+        }
+
+        float diffuse = std::max(dot(n, lightDir), 0.0f) * light.intensity * atten;
+        if (diffuse <= 0.0f) continue;
+
+        int cr, cg, cb, ca;
+        GetColor(light.color, cr, cg, cb, ca);
+        outR += diffuse * (cr / 255.0f);
+        outG += diffuse * (cg / 255.0f);
+        outB += diffuse * (cb / 255.0f);
+    }
+
+    outR = std::min(outR, 2.0f); // allow some overbright headroom before clamping at pixel stage
+    outG = std::min(outG, 2.0f);
+    outB = std::min(outB, 2.0f);
+}
+
 void rasterizeBand(Screen& screen, const std::vector<RasterTriangle>& jobs,
                     int yStart, int yEnd){
     for (const auto& job : jobs){
@@ -438,7 +497,16 @@ void rasterizeBand(Screen& screen, const std::vector<RasterTriangle>& jobs,
 			return job.tex->sample(u, v);
 		};
 
-        drawTriangle(screen, job, yStart, yEnd);
+		auto lightShader = [lr = job.lightR, lg = job.lightG, lb = job.lightB]
+                            (const ShaderFragment& f, uint32_t colorIn) {
+            return applyLightRGB(colorIn, lr, lg, lb);
+        };
+
+		if (std::size(job.tex->pixels)){
+			drawTriangle(screen, job, yStart, yEnd, texShader, lightShader);
+		}else{
+			drawTriangle(screen, job, yStart, yEnd, lightShader);
+		}
     }
 }
 
@@ -456,7 +524,7 @@ void renderScene(Scene& scene, Camera& cam, RasterPool& pool){
         Mat4x4 translation = makeTranslation(model.worldPos);
         Mat4x4 combined = multiply(translation, model.transform);
 
-        projectModel(scene.screen, out, cam, model, combined, pool);
+        projectModel(scene.screen, out, cam, model, combined, pool, scene.lights);
     }
     rasterizeParallel(scene.screen, out, pool);
 }

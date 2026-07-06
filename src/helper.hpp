@@ -44,8 +44,11 @@ Clip ClipModelPlane(Model& model, Camera& cam, Mat4x4 transform);
 
 std::vector<Vertex> ClipPolygonPlane(std::vector<Vertex> poly, Plane plane);
 
-void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam,
-                           Model& model, Mat4x4 transform, RasterPool& pool);
+void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam, Model& model,
+		Mat4x4 transform, RasterPool& pool, const std::vector<Light>& lights);
+
+void accumulateLighting(FPos3 n, FPos3 worldPos, const std::vector<Light>& lights,
+                                float& outR, float& outG, float& outB);
 
 void rasterizeBand(Screen& screen, const std::vector<RasterTriangle>& jobs,
                     int yStart, int yEnd);

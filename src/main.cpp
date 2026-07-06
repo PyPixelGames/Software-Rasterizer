@@ -12,21 +12,28 @@ int main(int argc, char* argv[]) {
     std::mt19937 rng(rd());
 
 	Scene scene;
-	RasterPool pool(scene.screen.height);
 	Camera cam (90, static_cast<float>(scene.screen.width)/scene.screen.height);
-	//cam.planes[0].D = -1;
 	Renderer renderer(scene.screen.width, scene.screen.height);
 
-	ObjModel modelOBJ = parseObjHeader("src/models/GTR.obj");
-	//ObjModel modelOBJ = parseObjHeader("src/models/couch.obj");
+	RasterPool pool(scene.screen.height);
 
-	//Model model {modelOBJ, FPos3{-1.5f, -0.5f, 5.0f}};
+	ObjModel modelOBJ = parseObjHeader("src/models/compex.obj");
 	Model model {modelOBJ, FPos3{0.0f, -0.5f, 5.0f}};
-	model.texture = loadTexture("src/models/testcubetexture.png");
+
+	model.texture = loadTexture("src/models/complextexture.png");
+
 	float angle=0;
 	model.transform = multiply(model.transform, makeRotationY(angle));
-
 	scene.models.push_back(model);
+
+	scene.lights.push_back(Light{
+			LightType::Directional,
+			FPos3{-0.4f, 0.8f, -0.4f}, //Direction
+			{},						   // Position (for the point light
+			0.9f,					   // Intensity
+			0.0f,					   // range 0.0 meaning infinite
+			WHITE					   // Color
+			});
 
     bool running = true;
 	while (running) {

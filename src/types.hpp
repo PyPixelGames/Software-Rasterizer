@@ -214,13 +214,6 @@ struct Camera{
     }
 };
 
-struct Scene{
-	Screen screen;
-
-	std::vector<Model> models;
-	uint32_t bgColor = Color(45, 45, 45, 255);
-};
-
 struct RasterTriangle {
     Pos2 p0, p1, p2;
     float z0, z1, z2;
@@ -228,6 +221,7 @@ struct RasterTriangle {
     float v0, v1, v2;
     const Texture* tex;
     int minY, maxY;
+	float lightR = 1.0f, lightG = 1.0f, lightB = 1.0f;
 };
 
 struct RasterPool {
@@ -325,4 +319,26 @@ struct RasterPool {
 		cvStart.notify_all();
 		cvDone.wait(lock, [this]{ return completed == (int)numThreads; });
 	}
+};
+
+enum class LightType {
+    Directional = 0,
+    Point = 1
+};
+
+struct Light {
+    LightType type = LightType::Directional;
+    FPos3 direction = {0.0f, 1.0f, 0.0f};
+    FPos3 position  = {0.0f, 0.0f, 0.0f};
+    float intensity = 1.0f;
+    float range     = 10.0f;
+    uint32_t color  = WHITE;
+};
+
+struct Scene{
+	Screen screen;
+
+	std::vector<Model> models;
+	std::vector<Light> lights;
+	uint32_t bgColor = Color(45, 45, 45, 255);
 };
