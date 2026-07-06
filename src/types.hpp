@@ -6,6 +6,10 @@
 #include <array>
 #include <cmath>
 #include <climits>
+#include <condition_variable>
+#include <mutex>
+#include <functional>
+#include <thread>
 
 inline uint32_t Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255){
     return (a << 24) | (r << 16) | (g << 8) | b;
@@ -124,6 +128,13 @@ struct Viewport{
 struct Vertex {
     FPos3 pos;
     TextureCoord uv;
+	std::array<float, 8> attribs{};
+};
+
+struct ShaderFragment {
+    std::array<float, 8> attribs;
+    float z;
+    int x, y;
 };
 
 struct Texture {
@@ -208,4 +219,115 @@ struct Scene{
 
 	std::vector<Model> models;
 	uint32_t bgColor = Color(45, 45, 45, 255);
+};
+
+struct RasterTriangle {
+    Pos2 p0, p1, p2;
+    float z0, z1, z2;
+    float u0, u1, u2;
+    float v0, v1, v2;
+    const Texture* tex;
+    int minY, maxY;
+};
+
+struct RasterPool {
+    std::vector<std::thread> workers;
+    std::mutex mtx;
+    std::condition_variable cvStart, cvDone;
+
+    std::function<void(int, int)> job; // (yStart, yEnd) -> void, set fresh each frame
+    std::vector<std::pair<int,int>> bands; // per-worker row ranges
+
+    int generation = 0;      // bumped each frame to wake workers exactly once
+    int completed = 0;       // how many workers finished this generation
+    bool stop = false;
+
+    unsigned numThreads;
+    int rowsPerThread;
+
+    RasterPool(int height){
+        numThreads = std::max(1u, std::thread::hardware_concurrency());
+        rowsPerThread = (height + numThreads - 1) / numThreads;
+
+        bands.resize(numThreads);
+        for (unsigned t = 0; t < numThreads; ++t){
+            int yStart = t * rowsPerThread;
+            int yEnd = yStart + rowsPerThread - 1;
+            bands[t] = {yStart, yEnd}; // clamped later per-frame against screen.height
+        }
+
+        for (unsigned t = 0; t < numThreads; ++t){
+            workers.emplace_back([this, t]{ workerLoop(t); });
+        }
+    }
+
+    ~RasterPool(){
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            stop = true;
+            generation++;
+        }
+        cvStart.notify_all();
+        for (auto& w : workers) w.join();
+    }
+
+    void workerLoop(unsigned idx){
+        int lastSeenGen = 0;
+        while (true){
+            std::unique_lock<std::mutex> lock(mtx);
+            cvStart.wait(lock, [this, &lastSeenGen]{
+                return stop || generation != lastSeenGen;
+            });
+            if (stop) return;
+            lastSeenGen = generation;
+            auto [yStart, yEnd] = bands[idx];
+            lock.unlock();
+
+            job(yStart, yEnd); // do the actual band rasterization
+
+            lock.lock();
+            completed++;
+            if (completed == (int)numThreads) cvDone.notify_one();
+        }
+    }
+
+    // Call once per frame: assigns job, wakes workers, waits for all bands done
+    void runFrame(int screenHeight, std::function<void(int,int)> frameJob){
+        std::unique_lock<std::mutex> lock(mtx);
+        job = std::move(frameJob);
+        completed = 0;
+
+        // clamp bands to current screen height (in case it changed)
+        for (auto& band : bands){
+            band.second = std::min(band.second, screenHeight - 1);
+        }
+
+        generation++;
+        cvStart.notify_all();
+        cvDone.wait(lock, [this]{ return completed == (int)numThreads; });
+    }
+
+	// Add this inside struct RasterPool
+	void runGenericParallel(unsigned taskCount, std::function<void(unsigned, unsigned, unsigned)> workerJob) {
+		std::unique_lock<std::mutex> lock(mtx);
+		completed = 0;
+
+		unsigned itemsPerThread = (taskCount + numThreads - 1) / numThreads;
+
+		job = [this, taskCount, itemsPerThread, workerJob](int yStart, int yEnd) {
+			// Here idx is derived based on the thread matching its band boundaries
+			// We calculate which partition index this worker owns:
+			unsigned threadIdx = yStart / this->rowsPerThread;
+			unsigned startIdx = threadIdx * itemsPerThread;
+			unsigned endIdx = std::min(startIdx + itemsPerThread, taskCount);
+
+			if (startIdx < endIdx) {
+				workerJob(startIdx, endIdx, threadIdx);
+			}
+		};
+
+		generation++;
+		cvStart.notify_all();
+		cvDone.wait(lock, [this]{ return completed == (int)numThreads; });
+	}
 };

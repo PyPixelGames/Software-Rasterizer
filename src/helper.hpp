@@ -9,24 +9,13 @@ void drawLine(Screen& screen, Pos2 P0, Pos2 P1, uint32_t color=WHITE);
 
 std::vector<short int> interpolatePoints(short int i0, short int o0, short int i1, short int o1);
 
-void edgeInterpolate(short int l0, short int i0, short int l1, short int i1,
-		short int l2, short int i2, std::vector<short int>& v02, std::vector<short int>& v012);
+template<typename T, size_t N>
+void edgeInterpolateStatic(short int l0, T i0, short int l1, T i1, short int l2, T i2,
+		std::array<T, N>& v02, std::array<T, N>& v012, short int baseOffset);
 
-std::vector<float> interpolatePointsFloat(float l0, float i0, float l1, float i1);
-
-void edgeInterpolateFloat(short int l0, float i0, short int l1, float i1,
-		short int l2, float i2, std::vector<float>& v02, std::vector<float>& v012);
-
-void drawWireframeTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color=WHITE);
-
-void drawFilledTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color,
-		std::vector<float> zs);
-
-void drawTexturedTriangle(Screen& screen, const Texture& tex, Pos2 p0, Pos2 p1, Pos2 p2,
-                           std::vector<float> zs, std::vector<float> us, std::vector<float> vs);
-
-void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
-		Pos2 p2, float h2, uint32_t color=WHITE);
+template <typename... ShaderFns>
+void drawTriangle(Screen& screen, RasterTriangle tri,int MinY, int MaxY,
+		ShaderFns&&... shaders);
 
 FPos2 worldToViewport(Viewport& port, FPos3 pos);
 
@@ -38,7 +27,8 @@ float toRadians(float angle);
 
 float PlaneToPointSignedDistance(Plane plane, FPos3 point);
 
-std::vector<Vertex> TriToF3(std::vector<int> tri, std::vector<int> texTri, Model& model, Mat4x4 transform);
+std::vector<Vertex> DataToVertex(std::vector<int> tri, std::vector<int> texTri,
+		Model& model, Mat4x4 transform);
 
 Mat4x4 makeRotationY(float degrees);
 
@@ -50,11 +40,16 @@ Mat4x4 multiply(Mat4x4 a, Mat4x4 b);
 
 Vec4 multiplyVec4(Mat4x4 mat, Vec4 vec);
 
-Clip ClipModelPlane(Model& model, Camera& cam,Mat4x4 transform);
+Clip ClipModelPlane(Model& model, Camera& cam, Mat4x4 transform);
 
-std::vector<FPos3> ClipPolygonPlane(std::vector<FPos3> poly, Plane plane);
+std::vector<Vertex> ClipPolygonPlane(std::vector<Vertex> poly, Plane plane);
 
-void renderModel(Screen& screen, Camera& cam, Model& model,
-		Mat4x4 transform=Identity4x4);
+void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam,
+                           Model& model, Mat4x4 transform, RasterPool& pool);
 
-void renderScene(Scene& scene, Camera& cam);
+void rasterizeBand(Screen& screen, const std::vector<RasterTriangle>& jobs,
+                    int yStart, int yEnd);
+
+void rasterizeParallel(Screen& screen, const std::vector<RasterTriangle>& jobs, RasterPool& pool);
+
+void renderScene(Scene& scene, Camera& cam, RasterPool& pool);

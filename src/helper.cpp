@@ -84,126 +84,87 @@ std::vector<short int> interpolatePoints(short int l0, short int i0, short int l
 	return values;
 }
 
-void edgeInterpolate(short int l0, short int i0, short int l1, short int i1,
-		short int l2, short int i2, std::vector<short int>& v02, std::vector<short int>& v012){
-	std::vector<short int> t01 = interpolatePoints(l0, i0, l1, i1);
-	std::vector<short int> t12 = interpolatePoints(l1, i1, l2, i2);
-	std::vector<short int> t02 = interpolatePoints(l0, i0, l2, i2);
-	t01.pop_back();
-	v012 = t01;
-	v012.insert(v012.end(), t12.begin(), t12.end());
-	v02 = t02;
-}
-
-std::vector<float> interpolatePointsFloat(float l0, float i0, float l1, float i1){
-	// the "i" variables are the ones you don't want to interpolate
-	// "l" is for leave me alone
-	if (l0==l1){
-		return {i0};
-	}
-
-	std::vector<float> values;
-	values.reserve(static_cast<int>(l1-l0+1));
-	float a = (float)(i1-i0)/(l1-l0);
-	float i = i0;
-	for (int l=l0; l<=l1; l++){
-		values.push_back(i);
-		i = i+a;
-	}
-	return values;
-}
-
-void edgeInterpolateFloat(short int l0, float i0, short int l1, float i1,
-		short int l2, float i2, std::vector<float>& v02, std::vector<float>& v012){
-	std::vector<float> t01 = interpolatePointsFloat(l0, i0, l1, i1);
-	std::vector<float> t12 = interpolatePointsFloat(l1, i1, l2, i2);
-	std::vector<float> t02 = interpolatePointsFloat(l0, i0, l2, i2);
-	t01.pop_back();
-	v012 = t01;
-	v012.insert(v012.end(), t12.begin(), t12.end());
-	v02 = t02;
-}
-
-void drawWireframeTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color){
-	drawLine(screen, p0, p1, color);
-	drawLine(screen, p0, p2, color);
-	drawLine(screen, p2, p1, color);
-}
-
-void drawFilledTriangle(Screen& screen, Pos2 p0, Pos2 p1, Pos2 p2, uint32_t color,
-                        std::vector<float> zs){
-    if (p1.y < p0.y) { std::swap(p1, p0); std::swap(zs[1], zs[0]); }
-    if (p2.y < p0.y) { std::swap(p2, p0); std::swap(zs[2], zs[0]); }
-    if (p2.y < p1.y) { std::swap(p2, p1); std::swap(zs[2], zs[1]); }
-
-    std::vector<short int> x02, x012;
-    std::vector<float> iz02, iz012;
-    edgeInterpolate(p0.y, p0.x, p1.y, p1.x, p2.y, p2.x, x02, x012);
-    edgeInterpolateFloat(p0.y, zs[0], p1.y, zs[1], p2.y, zs[2], iz02, iz012);
-
-    std::vector<short int> *x_left, *x_right;
-    std::vector<float> *iz_left, *iz_right;
-
-    int crossProduct = (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
-
-    if (crossProduct < 0) {
-        x_right = &x02;   x_left = &x012;
-        iz_right = &iz02; iz_left = &iz012;
-    } else {
-        x_right = &x012;  x_left = &x02;
-        iz_right = &iz012; iz_left = &iz02;
-    }
-
-    int yStart = std::max((int)p0.y, 0);
-    int yEnd   = std::min((int)p2.y, screen.height - 1);
-
-    for (int y = yStart; y <= yEnd; y++){
-        int y_idx = y - p0.y;
-
-        if (y_idx < 0 || y_idx >= static_cast<int>(x_left->size())) continue;
-
-        int rawL = (*x_left)[y_idx];
-        int rawR = (*x_right)[y_idx];
-        if (rawL > rawR) continue;
-
-        float zL = (*iz_left)[y_idx];
-        float zR = (*iz_right)[y_idx];
-        float dz = (rawR != rawL) ? (zR - zL) / (rawR - rawL) : 0.0f;
-
-        int xL = std::max(rawL, 0);
-        int xR = std::min(rawR, screen.width - 1);
-        if (xL > xR) continue;
-
-        float z = zL + dz * (xL - rawL);
-        float* depthRow = screen.depthBuffer.data() + y * screen.width;
-        uint32_t* pixRow = screen.pixelBuffer.data() + y * screen.width;
-
-        for (int x = xL; x <= xR; x++, z += dz){
-            if (z >= depthRow[x]){
-                pixRow[x] = color;
-                depthRow[x] = z;
-            }
+template<typename T, size_t N>
+void edgeInterpolateStatic(short int l0, T i0, short int l1, T i1, short int l2, T i2,
+                           std::array<T, N>& v02, std::array<T, N>& v012, short int baseOffset) {
+    // Helper lambda to incrementally step-fill flat array sections
+    auto fillSegment = [&](short int startL, T startI, short int endL, T endI, std::array<T, N>& target) {
+        if (startL == endL) {
+            int idx = startL - baseOffset;
+            if (idx >= 0 && idx < static_cast<int>(N)) target[idx] = startI;
+            return;
         }
-    }
+        
+        float invDelta = 1.0f / (endL - startL);
+        // Always compute the step rate as a float
+        float stepRate = static_cast<float>(endI - startI) * invDelta;
+        // Keep the running accumulator as a float to prevent precision loss
+        float currentVal = static_cast<float>(startI);
+        
+        for (int l = startL; l <= endL; ++l) {
+            int idx = l - baseOffset;
+            if (idx >= 0 && idx < static_cast<int>(N)) {
+                // Cast back to T only when saving to the array
+                target[idx] = static_cast<T>(currentVal);
+            }
+            currentVal += stepRate;
+        }
+    };
+
+    // Fill structural long edge (0 to 2)
+    fillSegment(l0, i0, l2, i2, v02);
+
+    // Fill structural broken short edges (0 to 1, then 1 to 2)
+    fillSegment(l0, i0, l1, i1, v012);
+    fillSegment(l1, i1, l2, i2, v012);
 }
 
-void drawTexturedTriangle(Screen& screen, const Texture& tex, Pos2 p0, Pos2 p1, Pos2 p2,
-                           std::vector<float> zs, std::vector<float> us, std::vector<float> vs){
-    if (p1.y < p0.y) { std::swap(p1, p0); std::swap(zs[1], zs[0]); std::swap(us[1], us[0]); std::swap(vs[1], vs[0]); }
-    if (p2.y < p0.y) { std::swap(p2, p0); std::swap(zs[2], zs[0]); std::swap(us[2], us[0]); std::swap(vs[2], vs[0]); }
-    if (p2.y < p1.y) { std::swap(p2, p1); std::swap(zs[2], zs[1]); std::swap(us[2], us[1]); std::swap(vs[2], vs[1]); }
+template <typename... ShaderFns>
+void drawTriangle(Screen& screen, RasterTriangle tri, int MinY, int MaxY, ShaderFns&&... shaders) {
+    uint32_t color = PURPLE;
 
-    std::vector<short int> x02, x012;
-    std::vector<float> iz02, iz012, iu02, iu012, iv02, iv012;
-    edgeInterpolate(p0.y, p0.x, p1.y, p1.x, p2.y, p2.x, x02, x012);
-    edgeInterpolateFloat(p0.y, zs[0], p1.y, zs[1], p2.y, zs[2], iz02, iz012);
-    edgeInterpolateFloat(p0.y, us[0], p1.y, us[1], p2.y, us[2], iu02, iu012);
-    edgeInterpolateFloat(p0.y, vs[0], p1.y, vs[1], p2.y, vs[2], iv02, iv012);
+    // Sort vertices by Y coordinate
+    if (tri.p1.y < tri.p0.y) {
+        std::swap(tri.p1, tri.p0); std::swap(tri.z1, tri.z0);
+        std::swap(tri.u1, tri.u0); std::swap(tri.v1, tri.v0);
+    }
+    if (tri.p2.y < tri.p0.y) {
+        std::swap(tri.p2, tri.p0); std::swap(tri.z2, tri.z0);
+        std::swap(tri.u2, tri.u0); std::swap(tri.v2, tri.v0);
+    }
+    if (tri.p2.y < tri.p1.y) {
+        std::swap(tri.p2, tri.p1); std::swap(tri.z2, tri.z1);
+        std::swap(tri.u2, tri.u1); std::swap(tri.v2, tri.v1);
+    }
 
-    std::vector<short int> *x_left, *x_right;
-    std::vector<float> *iz_left, *iz_right, *iu_left, *iu_right, *iv_left, *iv_right;
+    // Early out if triangle is flat/degenerate or fully out of vertical bands
+    if (tri.p2.y == tri.p0.y) return;
+    int yStart = std::max((int)tri.p0.y, MinY);
+    int yEnd   = std::min((int)tri.p2.y, MaxY);
+    if (yStart > yEnd) return;
 
-    int crossProduct = (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
+    // Compute localized vertical headroom index span
+    int totalHeightSpan = tri.p2.y - tri.p0.y + 1;
+    if (totalHeightSpan <= 0) return;
+
+    // Use runtime stack arrays safely restricted to maximum possible screen limits
+    constexpr size_t MAX_SPAN = 600;
+    std::array<short int, MAX_SPAN> x02, x012;
+    std::array<float, MAX_SPAN> iz02, iz012, iu02, iu012, iv02, iv012;
+
+    short int baseOffset = tri.p0.y;
+
+    // Calculate raster attributes over stack lines
+    edgeInterpolateStatic(tri.p0.y, tri.p0.x, tri.p1.y, tri.p1.x, tri.p2.y, tri.p2.x, x02, x012, baseOffset);
+    edgeInterpolateStatic(tri.p0.y, tri.z0,   tri.p1.y, tri.z1,   tri.p2.y, tri.z2,   iz02, iz012, baseOffset);
+    edgeInterpolateStatic(tri.p0.y, tri.u0,   tri.p1.y, tri.u1,   tri.p2.y, tri.u2,   iu02, iu012, baseOffset);
+    edgeInterpolateStatic(tri.p0.y, tri.v0,   tri.p1.y, tri.v1,   tri.p2.y, tri.v2,   iv02, iv012, baseOffset);
+
+    // Explicitly identify left vs right bounding contours
+    std::array<short int, MAX_SPAN> *x_left, *x_right;
+    std::array<float, MAX_SPAN> *iz_left, *iz_right, *iu_left, *iu_right, *iv_left, *iv_right;
+
+    int crossProduct = (tri.p1.x - tri.p0.x) * (tri.p2.y - tri.p0.y) - (tri.p1.y - tri.p0.y) * (tri.p2.x - tri.p0.x);
 
     if (crossProduct < 0) {
         x_right = &x02;   x_left = &x012;
@@ -217,12 +178,10 @@ void drawTexturedTriangle(Screen& screen, const Texture& tex, Pos2 p0, Pos2 p1, 
         iv_right = &iv012; iv_left = &iv02;
     }
 
-    int yStart = std::max((int)p0.y, 0);
-    int yEnd   = std::min((int)p2.y, screen.height - 1);
-
-    for (int y = yStart; y <= yEnd; y++){
-        int y_idx = y - p0.y;
-        if (y_idx < 0 || y_idx >= static_cast<int>(x_left->size())) continue;
+    // Scanline loops over target segment block bounds
+    for (int y = yStart; y <= yEnd; y++) {
+        int y_idx = y - baseOffset;
+        if (y_idx < 0 || y_idx >= totalHeightSpan) continue;
 
         int rawL = (*x_left)[y_idx];
         int rawR = (*x_right)[y_idx];
@@ -232,106 +191,35 @@ void drawTexturedTriangle(Screen& screen, const Texture& tex, Pos2 p0, Pos2 p1, 
         float uL = (*iu_left)[y_idx], uR = (*iu_right)[y_idx];
         float vL = (*iv_left)[y_idx], vR = (*iv_right)[y_idx];
 
-        float dz = (rawR != rawL) ? (zR - zL) / (rawR - rawL) : 0.0f;
-        float du = (rawR != rawL) ? (uR - uL) / (rawR - rawL) : 0.0f;
-        float dv = (rawR != rawL) ? (vR - vL) / (rawR - rawL) : 0.0f;
+        float invWidth = (rawR != rawL) ? 1.0f / (rawR - rawL) : 0.0f;
+        float dz = (zR - zL) * invWidth;
+        float du = (uR - uL) * invWidth;
+        float dv = (vR - vL) * invWidth;
 
         int xL = std::max(rawL, 0);
         int xR = std::min(rawR, screen.width - 1);
         if (xL > xR) continue;
 
-        float z = zL + dz * (xL - rawL);
-        float u = uL + du * (xL - rawL);
-        float v = vL + dv * (xL - rawL);
+        float prestep = static_cast<float>(xL - rawL);
+        float z = zL + dz * prestep;
+        float u = uL + du * prestep;
+        float v = vL + dv * prestep;
 
         float* depthRow = screen.depthBuffer.data() + y * screen.width;
         uint32_t* pixRow = screen.pixelBuffer.data() + y * screen.width;
 
-        for (int x = xL; x <= xR; x++, z += dz, u += du, v += dv){
-            if (z >= depthRow[x]){
-                float invZ = z; // 1/z
-                float realU = u / invZ;
-                float realV = v / invZ;
-                pixRow[x] = tex.sample(realU, realV);
+        for (int x = xL; x <= xR; x++, z += dz, u += du, v += dv) {
+            if (z >= depthRow[x]) {
+                ShaderFragment frag{ {u / z, v / z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, z, x, y };
+
+                uint32_t outColor = color;
+                ((outColor = shaders(frag, outColor)), ...);
+
+                pixRow[x] = outColor;
                 depthRow[x] = z;
             }
         }
     }
-}
-
-void drawShadedTriangle(Screen& screen, Pos2 p0, float h0, Pos2 p1, float h1,
-		Pos2 p2, float h2, uint32_t color){
-	if (p1.y<p0.y) std::swap(p1, p0);
-	if (p2.y<p0.y) std::swap(p2, p0);
-	if (p2.y<p1.y) std::swap(p2, p1);
-
-	std::vector<short int> x01 = interpolatePoints(p0.y, p0.x, p1.y, p1.x);
-	std::vector<short int> x12 = interpolatePoints(p1.y, p1.x, p2.y, p2.x);
-	std::vector<short int> x02 = interpolatePoints(p0.y, p0.x, p2.y, p2.x);
-
-	x01.pop_back();
-	std::vector<short int> x012 = x01;
-	x012.insert(x012.end(), x12.begin(), x12.end());
-
-	std::vector<float> h01 = interpolatePointsFloat(p0.y, h0, p1.y, h1);
-	std::vector<float> h12 = interpolatePointsFloat(p1.y, h1, p2.y, h2);
-	std::vector<float> h02 = interpolatePointsFloat(p0.y, h0, p2.y, h2);
-
-	h01.pop_back();
-	std::vector<float> h012 = h01;
-	h012.insert(h012.end(), h12.begin(), h12.end());
-
-	std::vector<short int>* x_left;
-	std::vector<short int>* x_right;
-	std::vector<float>* h_left;
-	std::vector<float>* h_right;
-
-	int m = std::floor(x02.size()/2);
-	if (x02[m] > x012[m]){
-		x_right = &x02;  h_right = &h02;
-		x_left = &x012;  h_left = &h012;
-	}else{
-		x_right = &x012; h_right = &h012;
-		x_left = &x02;   h_left = &h02;
-	}
-
-	int r, g, b, a;
-	GetColor(color, r, g, b, a);
-	const float rf = static_cast<float>(r);
-	const float gf = static_cast<float>(g);
-	const float bf = static_cast<float>(b);
-
-	int yStart = std::max((int)p0.y, 0);
-	int yEnd   = std::min((int)p2.y, screen.height - 1);
-
-	for (int y=yStart; y<=yEnd; y++){
-		int y_idx = y - p0.y;
-
-		int rawL = (*x_left)[y_idx];
-		int rawR = (*x_right)[y_idx];
-		if (rawL > rawR) continue;
-
-		std::vector<float> h_segments = interpolatePointsFloat(
-				static_cast<float>(rawL), (*h_left)[y_idx],
-				static_cast<float>(rawR), (*h_right)[y_idx]);
-
-		int xL = std::max(rawL, 0);
-		int xR = std::min(rawR, screen.width - 1);
-		if (xL > xR) continue;
-
-		uint32_t* row = screen.pixelBuffer.data() + y * screen.width;
-
-		for (int x=xL; x<=xR; x++){
-			int x_idx = x - rawL;
-			float h = h_segments[x_idx];
-			row[x] = Color(
-				static_cast<int>(rf*h),
-				static_cast<int>(gf*h),
-				static_cast<int>(bf*h),
-				255
-			);
-		}
-	}
 }
 
 FPos2 worldToViewport(Viewport& port, FPos3 pos){
@@ -369,7 +257,7 @@ float PlaneToPointSignedDistance(Plane plane, FPos3 point){
 		plane.D;
 }
 
-std::vector<Vertex> TriToF3(std::vector<int> tri, std::vector<int> texTri, Model& model, Mat4x4 transform){
+std::vector<Vertex> DataToVertex(std::vector<int> tri, std::vector<int> texTri, Model& model, Mat4x4 transform){
     std::vector<Vertex> tris;
     for (size_t i = 0; i < tri.size(); i++){
         int v  = tri[i];
@@ -382,7 +270,7 @@ std::vector<Vertex> TriToF3(std::vector<int> tri, std::vector<int> texTri, Model
 
         TextureCoord c = (vt > 0) ? model.model.texCoords[vt-1] : TextureCoord{0.0f, 0.0f};
 
-        tris.push_back(Vertex{ FPos3{vert.x, vert.y, vert.z}, c });
+        tris.push_back(Vertex{ FPos3{vert.x, vert.y, vert.z}, c, {}});
     }
     return tris;
 }
@@ -483,66 +371,102 @@ std::vector<Vertex> ClipPolygonPlane(std::vector<Vertex> poly, Plane plane){
     return out;
 }
 
-void renderModel(Screen& screen, Camera& cam, Model& model, Mat4x4 transform){
-	Clip clip = ClipModelPlane(model, cam, transform);
-	if (clip.state==ClipState::Outside){
-		return;
-	}
+void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam,
+                           Model& model, Mat4x4 transform, RasterPool& pool) {
+    Clip clip = ClipModelPlane(model, cam, transform);
+    if (clip.state == ClipState::Outside) return;
 
-	for (size_t t = 0; t < model.model.tris.size(); t++){
-		std::vector<int> tri = model.model.tris[t];
-		std::vector<int> texTri = model.model.triTexCoords[t];
-		std::vector<Vertex> poly = TriToF3(tri, texTri, model, transform);
+    size_t totalTris = model.model.tris.size();
 
-		if (clip.state==ClipState::Intersect){
-			for (int idx : clip.intersectedIndexes){
-				poly = ClipPolygonPlane(poly, cam.planes[idx]);
-				if (poly.empty()) break;
-			}
-		}
+    // Create an independent storage array for each thread to avoid lock contention
+    std::vector<std::vector<RasterTriangle>> perThreadOut(pool.numThreads);
 
-		if (poly.size() >= 3){
-			FPos3 e1{poly[1].pos.x-poly[0].pos.x, poly[1].pos.y-poly[0].pos.y, poly[1].pos.z-poly[0].pos.z};
-			FPos3 e2{poly[2].pos.x-poly[0].pos.x, poly[2].pos.y-poly[0].pos.y, poly[2].pos.z-poly[0].pos.z};
-			FPos3 normal = cross(e2, e1);
-			FPos3 viewDir = poly[0].pos;
+    pool.runGenericParallel(totalTris, [&](unsigned startIdx, unsigned endIdx, unsigned threadIdx) {
+        // Reserve an estimated capacity to minimize internal vector reallocations
+        perThreadOut[threadIdx].reserve((endIdx - startIdx) / 2);
 
-			if (dot(normal, viewDir) >= 0.0f){
-				continue; //Back-face culling
-			}
+        for (size_t t = startIdx; t < endIdx; ++t) {
+            std::vector<int> tri = model.model.tris[t];
+            std::vector<int> texTri = model.model.triTexCoords[t];
+            std::vector<Vertex> poly = DataToVertex(tri, texTri, model, transform);
 
-			// fan-triangulate: (poly[0], poly[i], poly[i+1]) for i in 1..poly.size()-2
-			for (size_t i = 1; i+1 < poly.size(); i++){
-				Pos2 p0 = projectVertex(screen, cam.port, F3ToVec4(poly[0].pos));
-				Pos2 p1 = projectVertex(screen, cam.port, F3ToVec4(poly[i].pos));
-				Pos2 p2 = projectVertex(screen, cam.port, F3ToVec4(poly[i+1].pos));
+            if (clip.state == ClipState::Intersect) {
+                for (int idx : clip.intersectedIndexes) {
+                    poly = ClipPolygonPlane(poly, cam.planes[idx]);
+                    if (poly.empty()) break;
+                }
+            }
 
-				if (p0.y == p1.y && p1.y == p2.y) continue; // Fully flat triangle
+            if (poly.size() >= 3) {
+                FPos3 e1{poly[1].pos.x-poly[0].pos.x, poly[1].pos.y-poly[0].pos.y, poly[1].pos.z-poly[0].pos.z};
+                FPos3 e2{poly[2].pos.x-poly[0].pos.x, poly[2].pos.y-poly[0].pos.y, poly[2].pos.z-poly[0].pos.z};
+                FPos3 normal = cross(e2, e1);
+                FPos3 viewDir = poly[0].pos;
 
-				if (isLineTriangle(p0, p1, p2)) continue; // A line, not a triangle
+                if (dot(normal, viewDir) >= 0.0f) continue; // Back-face culling
 
-				//drawFilledTriangle(screen, p0, p1, p2,
-				//		Colors[tri[0]%std::size(Colors)],
-				//		{1.0f/poly[0].pos.z, 1.0f/poly[i].pos.z, 1.0f/poly[i+1].pos.z});
-				float iz0 = 1.0f/poly[0].pos.z;
-				float izI = 1.0f/poly[i].pos.z;
-				float izI1 = 1.0f/poly[i+1].pos.z;
+                for (size_t i = 1; i + 1 < poly.size(); i++) {
+                    Pos2 p0 = projectVertex(screen, cam.port, F3ToVec4(poly[0].pos));
+                    Pos2 p1 = projectVertex(screen, cam.port, F3ToVec4(poly[i].pos));
+                    Pos2 p2 = projectVertex(screen, cam.port, F3ToVec4(poly[i+1].pos));
 
-				drawTexturedTriangle(screen, model.texture, p0, p1, p2,
-						{iz0, izI, izI1},
-						{poly[0].uv.u*iz0, poly[i].uv.u*izI, poly[i+1].uv.u*izI1},
-						{poly[0].uv.v*iz0, poly[i].uv.v*izI, poly[i+1].uv.v*izI1});
-			}
-		}
-	}
+                    if (p0.y == p1.y && p1.y == p2.y) continue;
+                    if (isLineTriangle(p0, p1, p2)) continue;
+
+                    float iz0 = 1.0f / poly[0].pos.z;
+                    float izI = 1.0f / poly[i].pos.z;
+                    float izI1 = 1.0f / poly[i+1].pos.z;
+
+                    RasterTriangle job{
+                        p0, p1, p2,
+                        iz0, izI, izI1,
+                        poly[0].uv.u*iz0, poly[i].uv.u*izI, poly[i+1].uv.u*izI1,
+                        poly[0].uv.v*iz0, poly[i].uv.v*izI, poly[i+1].uv.v*izI1,
+                        &model.texture,
+                        std::min({(int)p0.y, (int)p1.y, (int)p2.y}),
+                        std::max({(int)p0.y, (int)p1.y, (int)p2.y})
+                    };
+
+                    perThreadOut[threadIdx].push_back(job);
+                }
+            }
+        }
+    });
+
+    // Flatten all thread vectors into the main output vector
+    size_t totalJobsGenerated = 0;
+    for (const auto& vec : perThreadOut) totalJobsGenerated += vec.size();
+    out.reserve(totalJobsGenerated);
+
+    for (const auto& vec : perThreadOut) {
+        out.insert(out.end(), vec.begin(), vec.end());
+    }
 }
 
-void renderScene(Scene& scene, Camera& cam){
-	scene.screen.clear(scene.bgColor);
+void rasterizeBand(Screen& screen, const std::vector<RasterTriangle>& jobs,
+                    int yStart, int yEnd){
+    for (const auto& job : jobs){
+        if (job.maxY < yStart || job.minY > yEnd) continue;
+        drawTriangle(screen, job, yStart, yEnd);
+    }
+}
 
-	for (auto model: scene.models){
-		Mat4x4 translation = makeTranslation(model.worldPos);
+void rasterizeParallel(Screen& screen, const std::vector<RasterTriangle>& jobs, RasterPool& pool){
+    pool.runFrame(screen.height, [&screen, &jobs](int yStart, int yEnd){
+        rasterizeBand(screen, jobs, yStart, yEnd);
+    });
+}
+
+void renderScene(Scene& scene, Camera& cam, RasterPool& pool){
+    scene.screen.clear(scene.bgColor);
+    std::vector<RasterTriangle> out;
+
+    for (auto& model : scene.models){
+        Mat4x4 translation = makeTranslation(model.worldPos);
         Mat4x4 combined = multiply(translation, model.transform);
-		renderModel(scene.screen, cam, model, combined);
-	}
+
+        // Call the newly optimized multithreaded projection step
+        projectModel(scene.screen, out, cam, model, combined, pool);
+    }
+    rasterizeParallel(scene.screen, out, pool);
 }

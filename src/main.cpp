@@ -12,15 +12,16 @@ int main(int argc, char* argv[]) {
     std::mt19937 rng(rd());
 
 	Scene scene;
+	RasterPool pool(scene.screen.height);
 	Camera cam (90, static_cast<float>(scene.screen.width)/scene.screen.height);
 	//cam.planes[0].D = -1;
 	Renderer renderer(scene.screen.width, scene.screen.height);
 
-	ObjModel modelOBJ = parseObjHeader("src/models/testcube.obj");
+	ObjModel modelOBJ = parseObjHeader("src/models/GTR.obj");
 	//ObjModel modelOBJ = parseObjHeader("src/models/couch.obj");
 
 	//Model model {modelOBJ, FPos3{-1.5f, -0.5f, 5.0f}};
-	Model model {modelOBJ, FPos3{0.0f, -1.5f, 3.0f}};
+	Model model {modelOBJ, FPos3{0.0f, -1.5f, 5.0f}};
 	model.texture = loadTexture("src/models/testcubetexture.png");
 	float angle=0;
 	model.transform = multiply(model.transform, makeRotationY(angle));
@@ -33,7 +34,7 @@ int main(int argc, char* argv[]) {
 
 		scene.models[0].transform = multiply(Identity4x4, makeRotationY(angle));
 
-		renderScene(scene, cam);
+		renderScene(scene, cam, pool);
 
 		// render and do some key press checks
 		if (renderer.update(scene.screen)==false) running=false;
