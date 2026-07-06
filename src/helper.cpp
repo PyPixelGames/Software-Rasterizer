@@ -454,7 +454,7 @@ void rasterizeBand(Screen& screen, const std::vector<RasterTriangle>& jobs,
 			return job.tex->sample(u, v);
 		};
 
-        drawTriangle(screen, job, yStart, yEnd, texShader);
+        drawTriangle(screen, job, yStart, yEnd);
     }
 }
 
