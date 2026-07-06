@@ -97,7 +97,6 @@ ObjModel parseObjHeader(const std::string& filename) {
 
 	data.sphere_radius = r;
 	data.sphere_center = avg;
-	std::cout << r << std::endl;
 
     file.close();
     return data;

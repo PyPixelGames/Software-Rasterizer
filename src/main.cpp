@@ -17,11 +17,11 @@ int main(int argc, char* argv[]) {
 	//cam.planes[0].D = -1;
 	Renderer renderer(scene.screen.width, scene.screen.height);
 
-	ObjModel modelOBJ = parseObjHeader("src/models/street.obj");
+	ObjModel modelOBJ = parseObjHeader("src/models/GTR.obj");
 	//ObjModel modelOBJ = parseObjHeader("src/models/couch.obj");
 
 	//Model model {modelOBJ, FPos3{-1.5f, -0.5f, 5.0f}};
-	Model model {modelOBJ, FPos3{0.0f, -1.5f, 5.0f}};
+	Model model {modelOBJ, FPos3{0.0f, -0.5f, 5.0f}};
 	model.texture = loadTexture("src/models/testcubetexture.png");
 	float angle=0;
 	model.transform = multiply(model.transform, makeRotationY(angle));

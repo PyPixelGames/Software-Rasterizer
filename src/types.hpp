@@ -235,11 +235,11 @@ struct RasterPool {
     std::mutex mtx;
     std::condition_variable cvStart, cvDone;
 
-    std::function<void(int, int)> job; // (yStart, yEnd) -> void, set fresh each frame
-    std::vector<std::pair<int,int>> bands; // per-worker row ranges
+    std::function<void(int, int)> job;
+    std::vector<std::pair<int,int>> bands;
 
-    int generation = 0;      // bumped each frame to wake workers exactly once
-    int completed = 0;       // how many workers finished this generation
+    int generation = 0;
+    int completed = 0;
     bool stop = false;
 
     unsigned numThreads;
@@ -253,7 +253,7 @@ struct RasterPool {
         for (unsigned t = 0; t < numThreads; ++t){
             int yStart = t * rowsPerThread;
             int yEnd = yStart + rowsPerThread - 1;
-            bands[t] = {yStart, yEnd}; // clamped later per-frame against screen.height
+            bands[t] = {yStart, yEnd};
         }
 
         for (unsigned t = 0; t < numThreads; ++t){
@@ -283,7 +283,7 @@ struct RasterPool {
             auto [yStart, yEnd] = bands[idx];
             lock.unlock();
 
-            job(yStart, yEnd); // do the actual band rasterization
+            job(yStart, yEnd);
 
             lock.lock();
             completed++;
@@ -291,13 +291,11 @@ struct RasterPool {
         }
     }
 
-    // Call once per frame: assigns job, wakes workers, waits for all bands done
     void runFrame(int screenHeight, std::function<void(int,int)> frameJob){
         std::unique_lock<std::mutex> lock(mtx);
         job = std::move(frameJob);
         completed = 0;
 
-        // clamp bands to current screen height (in case it changed)
         for (auto& band : bands){
             band.second = std::min(band.second, screenHeight - 1);
         }
@@ -307,7 +305,6 @@ struct RasterPool {
         cvDone.wait(lock, [this]{ return completed == (int)numThreads; });
     }
 
-	// Add this inside struct RasterPool
 	void runGenericParallel(unsigned taskCount, std::function<void(unsigned, unsigned, unsigned)> workerJob) {
 		std::unique_lock<std::mutex> lock(mtx);
 		completed = 0;
@@ -315,8 +312,6 @@ struct RasterPool {
 		unsigned itemsPerThread = (taskCount + numThreads - 1) / numThreads;
 
 		job = [this, taskCount, itemsPerThread, workerJob](int yStart, int yEnd) {
-			// Here idx is derived based on the thread matching its band boundaries
-			// We calculate which partition index this worker owns:
 			unsigned threadIdx = yStart / this->rowsPerThread;
 			unsigned startIdx = threadIdx * itemsPerThread;
 			unsigned endIdx = std::min(startIdx + itemsPerThread, taskCount);

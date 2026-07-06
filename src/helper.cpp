@@ -87,7 +87,6 @@ std::vector<short int> interpolatePoints(short int l0, short int i0, short int l
 template<typename T, size_t N>
 void edgeInterpolateStatic(short int l0, T i0, short int l1, T i1, short int l2, T i2,
                            std::array<T, N>& v02, std::array<T, N>& v012, short int baseOffset) {
-    // Helper lambda to incrementally step-fill flat array sections
     auto fillSegment = [&](short int startL, T startI, short int endL, T endI, std::array<T, N>& target) {
         if (startL == endL) {
             int idx = startL - baseOffset;
@@ -96,25 +95,20 @@ void edgeInterpolateStatic(short int l0, T i0, short int l1, T i1, short int l2,
         }
 
         float invDelta = 1.0f / (endL - startL);
-        // Always compute the step rate as a float
         float stepRate = static_cast<float>(endI - startI) * invDelta;
-        // Keep the running accumulator as a float to prevent precision loss
         float currentVal = static_cast<float>(startI);
 
         for (int l = startL; l <= endL; ++l) {
             int idx = l - baseOffset;
             if (idx >= 0 && idx < static_cast<int>(N)) {
-                // Cast back to T only when saving to the array
                 target[idx] = static_cast<T>(currentVal);
             }
             currentVal += stepRate;
         }
     };
 
-    // Fill structural long edge (0 to 2)
     fillSegment(l0, i0, l2, i2, v02);
 
-    // Fill structural broken short edges (0 to 1, then 1 to 2)
     fillSegment(l0, i0, l1, i1, v012);
     fillSegment(l1, i1, l2, i2, v012);
 }
@@ -123,7 +117,6 @@ template <typename... ShaderFns>
 void drawTriangle(Screen& screen, RasterTriangle tri, int MinY, int MaxY, ShaderFns&&... shaders) {
     uint32_t color = PURPLE;
 
-    // Sort vertices by Y coordinate
     if (tri.p1.y < tri.p0.y) {
         std::swap(tri.p1, tri.p0); std::swap(tri.z1, tri.z0);
         std::swap(tri.u1, tri.u0); std::swap(tri.v1, tri.v0);
@@ -137,30 +130,25 @@ void drawTriangle(Screen& screen, RasterTriangle tri, int MinY, int MaxY, Shader
         std::swap(tri.u2, tri.u1); std::swap(tri.v2, tri.v1);
     }
 
-    // Early out if triangle is flat/degenerate or fully out of vertical bands
     if (tri.p2.y == tri.p0.y) return;
     int yStart = std::max((int)tri.p0.y, MinY);
     int yEnd   = std::min((int)tri.p2.y, MaxY);
     if (yStart > yEnd) return;
 
-    // Compute localized vertical headroom index span
     int totalHeightSpan = tri.p2.y - tri.p0.y + 1;
     if (totalHeightSpan <= 0) return;
 
-    // Use runtime stack arrays safely restricted to maximum possible screen limits
     constexpr size_t MAX_SPAN = 600;
     std::array<short int, MAX_SPAN> x02, x012;
     std::array<float, MAX_SPAN> iz02, iz012, iu02, iu012, iv02, iv012;
 
     short int baseOffset = tri.p0.y;
 
-    // Calculate raster attributes over stack lines
     edgeInterpolateStatic(tri.p0.y, tri.p0.x, tri.p1.y, tri.p1.x, tri.p2.y, tri.p2.x, x02, x012, baseOffset);
     edgeInterpolateStatic(tri.p0.y, tri.z0,   tri.p1.y, tri.z1,   tri.p2.y, tri.z2,   iz02, iz012, baseOffset);
     edgeInterpolateStatic(tri.p0.y, tri.u0,   tri.p1.y, tri.u1,   tri.p2.y, tri.u2,   iu02, iu012, baseOffset);
     edgeInterpolateStatic(tri.p0.y, tri.v0,   tri.p1.y, tri.v1,   tri.p2.y, tri.v2,   iv02, iv012, baseOffset);
 
-    // Explicitly identify left vs right bounding contours
     std::array<short int, MAX_SPAN> *x_left, *x_right;
     std::array<float, MAX_SPAN> *iz_left, *iz_right, *iu_left, *iu_right, *iv_left, *iv_right;
 
@@ -178,7 +166,6 @@ void drawTriangle(Screen& screen, RasterTriangle tri, int MinY, int MaxY, Shader
         iv_right = &iv012; iv_left = &iv02;
     }
 
-    // Scanline loops over target segment block bounds
     for (int y = yStart; y <= yEnd; y++) {
         int y_idx = y - baseOffset;
         if (y_idx < 0 || y_idx >= totalHeightSpan) continue;
@@ -378,11 +365,9 @@ void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam,
 
     size_t totalTris = model.model.tris.size();
 
-    // Create an independent storage array for each thread to avoid lock contention
     std::vector<std::vector<RasterTriangle>> perThreadOut(pool.numThreads);
 
     pool.runGenericParallel(totalTris, [&](unsigned startIdx, unsigned endIdx, unsigned threadIdx) {
-        // Reserve an estimated capacity to minimize internal vector reallocations
         perThreadOut[threadIdx].reserve((endIdx - startIdx) / 2);
 
         for (size_t t = startIdx; t < endIdx; ++t) {
@@ -433,7 +418,6 @@ void projectModel(Screen& screen, std::vector<RasterTriangle>& out, Camera& cam,
         }
     });
 
-    // Flatten all thread vectors into the main output vector
     size_t totalJobsGenerated = 0;
     for (const auto& vec : perThreadOut) totalJobsGenerated += vec.size();
     out.reserve(totalJobsGenerated);
@@ -472,7 +456,6 @@ void renderScene(Scene& scene, Camera& cam, RasterPool& pool){
         Mat4x4 translation = makeTranslation(model.worldPos);
         Mat4x4 combined = multiply(translation, model.transform);
 
-        // Call the newly optimized multithreaded projection step
         projectModel(scene.screen, out, cam, model, combined, pool);
     }
     rasterizeParallel(scene.screen, out, pool);
