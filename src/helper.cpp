@@ -94,13 +94,13 @@ void edgeInterpolateStatic(short int l0, T i0, short int l1, T i1, short int l2,
             if (idx >= 0 && idx < static_cast<int>(N)) target[idx] = startI;
             return;
         }
-        
+
         float invDelta = 1.0f / (endL - startL);
         // Always compute the step rate as a float
         float stepRate = static_cast<float>(endI - startI) * invDelta;
         // Keep the running accumulator as a float to prevent precision loss
         float currentVal = static_cast<float>(startI);
-        
+
         for (int l = startL; l <= endL; ++l) {
             int idx = l - baseOffset;
             if (idx >= 0 && idx < static_cast<int>(N)) {
@@ -210,7 +210,7 @@ void drawTriangle(Screen& screen, RasterTriangle tri, int MinY, int MaxY, Shader
 
         for (int x = xL; x <= xR; x++, z += dz, u += du, v += dv) {
             if (z >= depthRow[x]) {
-                ShaderFragment frag{ {u / z, v / z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, z, x, y };
+                ShaderFragment frag{ {u, v, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, z, x, y };
 
                 uint32_t outColor = color;
                 ((outColor = shaders(frag, outColor)), ...);
@@ -447,7 +447,14 @@ void rasterizeBand(Screen& screen, const std::vector<RasterTriangle>& jobs,
                     int yStart, int yEnd){
     for (const auto& job : jobs){
         if (job.maxY < yStart || job.minY > yEnd) continue;
-        drawTriangle(screen, job, yStart, yEnd);
+
+		auto texShader = [&job](const ShaderFragment& f, uint32_t colorIn) {
+			float u = f.attribs[0] / f.z;
+			float v = f.attribs[1] / f.z;
+			return job.tex->sample(u, v);
+		};
+
+        drawTriangle(screen, job, yStart, yEnd, texShader);
     }
 }
 

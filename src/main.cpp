@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
 	//cam.planes[0].D = -1;
 	Renderer renderer(scene.screen.width, scene.screen.height);
 
-	ObjModel modelOBJ = parseObjHeader("src/models/GTR.obj");
+	ObjModel modelOBJ = parseObjHeader("src/models/testcube.obj");
 	//ObjModel modelOBJ = parseObjHeader("src/models/couch.obj");
 
 	//Model model {modelOBJ, FPos3{-1.5f, -0.5f, 5.0f}};
