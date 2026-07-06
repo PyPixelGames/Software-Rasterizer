@@ -504,7 +504,7 @@ void renderModel(Screen& screen, Camera& cam, Model& model, Mat4x4 transform){
 		if (poly.size() >= 3){
 			FPos3 e1{poly[1].pos.x-poly[0].pos.x, poly[1].pos.y-poly[0].pos.y, poly[1].pos.z-poly[0].pos.z};
 			FPos3 e2{poly[2].pos.x-poly[0].pos.x, poly[2].pos.y-poly[0].pos.y, poly[2].pos.z-poly[0].pos.z};
-			FPos3 normal = cross(e1, e2);
+			FPos3 normal = cross(e2, e1);
 			FPos3 viewDir = poly[0].pos;
 
 			if (dot(normal, viewDir) >= 0.0f){

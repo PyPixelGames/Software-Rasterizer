@@ -34,6 +34,7 @@ ObjModel parseObjHeader(const std::string& filename) {
         else if (prefix == "v") {
             FPos3 v;
             ss >> v.x >> v.y >> v.z;
+			v.z = -v.z;
             data.vertices.push_back(v);
         }
         // Texture Coordinates
@@ -46,6 +47,7 @@ ObjModel parseObjHeader(const std::string& filename) {
         else if (prefix == "vn") {
             FPos3 vn;
             ss >> vn.x >> vn.y >> vn.z;
+			vn.z = -vn.z;
             data.normals.push_back(vn);
         }
 		// Faces

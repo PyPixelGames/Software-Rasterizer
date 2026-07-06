@@ -28,7 +28,7 @@ inline uint32_t ORANGE       = Color(225, 160, 16);
 inline uint32_t BROWN        = Color(140, 108, 76);
 inline uint32_t PALE         = Color(225, 208, 160);
 
-inline std::vector<uint32_t> Colors = {
+inline std::vector<uint32_t> Colors = { //Just for testing the renderer
 	GREEN,
 	BLUE,
 	RED,
@@ -67,7 +67,8 @@ struct Pos2 {
 
 struct FPos2{
 	float x=0.0f;
-	float y=0.0f; };
+	float y=0.0f;
+};
 
 struct Pos3{
 	short int x=0;
@@ -86,6 +87,10 @@ struct Vec4{
 	float y=0;
 	float z=0;
 	float w=0;
+};
+
+struct TextureCoord {
+	float u, v;
 };
 
 struct Screen {
@@ -116,8 +121,6 @@ struct Viewport{
     }
 };
 
-struct TextureCoord { float u, v; };
-
 struct Vertex {
     FPos3 pos;
     TextureCoord uv;
@@ -131,25 +134,36 @@ struct Texture {
         u = u - std::floor(u);
         v = v - std::floor(v);
         int x = std::min((int)(u * width),  width  - 1);
-        int y = std::min((int)((1.0f-v) * height), height - 1); // flip v if needed
+        int y = std::min((int)((1.0f-v) * height), height - 1);
         return pixels[y*width + x];
     }
 };
 
 struct ObjModel{
     std::string objName;
+
     std::vector<FPos3> vertices;
+	std::vector<std::vector<int>> tris;
+
+	std::vector<FPos3> normals;
+
     std::vector<std::vector<int>> triTexCoords;
     std::vector<TextureCoord> texCoords;
-    std::vector<FPos3> normals;
-    std::vector<std::vector<int>> tris;
+
+	// General sphere collider for clipping
 	float sphere_radius;
 	FPos3 sphere_center;
 };
 
 using Mat4x4 = std::array<std::array<float, 4>, 4>;
-constexpr Mat4x4 Identity4x4 = Mat4x4{{{1, 0, 0, 0}, {0, 1, 0, 0},
-						   {0, 0, 1, 0}, {0, 0, 0, 1}}};
+
+constexpr Mat4x4 Identity4x4 = Mat4x4{{
+	{1, 0, 0, 0},
+	{0, 1, 0, 0},
+	{0, 0, 1, 0},
+	{0, 0, 0, 1}
+}};
+
 struct Model{
 	ObjModel model;
 	FPos3 worldPos;
