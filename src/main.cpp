@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
 
 	RasterPool pool(scene.screen.height);
 
-	ObjModel modelOBJ = parseObjHeader("src/models/compex.obj");
+	ObjModel modelOBJ = parseObjHeader("src/models/complex.obj");
 	Model model {modelOBJ, FPos3{0.0f, -0.5f, 5.0f}};
 
 	model.texture = loadTexture("src/models/complextexture.png");
